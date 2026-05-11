@@ -818,7 +818,8 @@ const EVENT_TYPES = {
   pumping: { label: 'שאיבה', icon: '💧', color: '#64B5F6', bg: '#DCEEFF' },
   pee: { label: 'פיפי', icon: '💛', color: '#FFA726', bg: '#FFF3E0' },
   poo: { label: 'קקי', icon: '💩', color: '#8D6E63', bg: '#EFEBE9' },
-  sleep: { label: 'שינה', icon: '😴', color: '#9575CD', bg: '#EDE7F6' }
+  sleep: { label: 'שינה', icon: '😴', color: '#9575CD', bg: '#EDE7F6' },
+  vitamin_d: { label: 'ויטמין D', icon: '💊', color: '#F4A742', bg: '#FFF8E1' }
 };
 
 // ============== AUTH SCREEN (Google OAuth) ==============
@@ -1726,6 +1727,11 @@ const App = () => {
           <span className="quick-btn-icon">💩</span>
           <div className="quick-btn-title">קקי</div>
           <div className="quick-btn-sub">{lastByType.poo ? timeSince(lastByType.poo.started_at) : 'הוספה מהירה'}</div>
+        </button>
+        <button className="quick-btn cream" onClick={() => quickAdd('vitamin_d')}>
+          <span className="quick-btn-icon">💊</span>
+          <div className="quick-btn-title">ויטמין D</div>
+          <div className="quick-btn-sub">{lastByType.vitamin_d ? timeSince(lastByType.vitamin_d.started_at) : 'הוספה מהירה'}</div>
         </button>
         <button className="quick-btn mix" onClick={() => setModalType('sleep')}>
           <span className="quick-btn-icon">😴</span>
