@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="תינוקת">
-<title>מעקב התינוקת שלי 💕</title>
+<title>my baby 💕</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
@@ -426,6 +426,16 @@
     padding: 4px 8px;
   }
   .history-delete:active { color: var(--pink-500); }
+
+  .history-edit {
+    background: none;
+    border: none;
+    color: var(--gray-500);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 6px;
+  }
+  .history-edit:active { color: var(--blue-500); }
 
   /* Bottom Nav */
   .bottom-nav {
@@ -1036,6 +1046,115 @@ const AddEventModal = ({ type, onSave, onClose }) => {
   );
 };
 
+// ============== EDIT EVENT MODAL ==============
+const toLocalInputValue = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const EditEventModal = ({ event, onSave, onClose }) => {
+  const config = EVENT_TYPES[event.event_type];
+  const hasSide = event.event_type === 'nursing' || event.event_type === 'pumping';
+  const hasAmount = event.event_type === 'bottle' || event.event_type === 'pumping';
+  const hasDuration = event.event_type === 'nursing' || event.event_type === 'pumping' || event.event_type === 'bottle' || event.event_type === 'sleep';
+
+  const [startedAt, setStartedAt] = useState(toLocalInputValue(event.started_at));
+  const [endedAt, setEndedAt] = useState(toLocalInputValue(event.ended_at));
+  const [amount, setAmount] = useState(event.amount_ml ?? '');
+  const [side, setSide] = useState(event.side || 'right');
+  const [notes, setNotes] = useState(event.notes || '');
+
+  const handleSave = () => {
+    if (!startedAt) return;
+    const startDate = new Date(startedAt);
+    const endDate = endedAt ? new Date(endedAt) : null;
+    if (endDate && endDate < startDate) {
+      alert('שעת סיום קודמת לשעת התחלה');
+      return;
+    }
+    const patch = {
+      started_at: startDate.toISOString(),
+      ended_at: endDate ? endDate.toISOString() : null,
+      duration_seconds: endDate ? Math.floor((endDate - startDate) / 1000) : null,
+      notes: notes.trim() || null
+    };
+    if (hasAmount) patch.amount_ml = amount === '' ? null : parseInt(amount);
+    if (hasSide) patch.side = side;
+    onSave(patch);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-handle"></div>
+        <h2 className="modal-title">{config.icon} עריכת {config.label}</h2>
+
+        <div className="form-group">
+          <label className="form-label">התחלה</label>
+          <input
+            type="datetime-local"
+            className="form-input"
+            value={startedAt}
+            onChange={(e) => setStartedAt(e.target.value)}
+          />
+        </div>
+
+        {hasDuration && (
+          <div className="form-group">
+            <label className="form-label">סיום (אופציונלי)</label>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={endedAt}
+              onChange={(e) => setEndedAt(e.target.value)}
+            />
+          </div>
+        )}
+
+        {hasAmount && (
+          <div className="form-group">
+            <label className="form-label">כמות (מ״ל)</label>
+            <input
+              type="number"
+              className="form-input"
+              placeholder="לדוגמה: 120"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="numeric"
+            />
+          </div>
+        )}
+
+        {hasSide && (
+          <div className="form-group">
+            <label className="form-label">{event.event_type === 'nursing' ? 'איזה צד' : 'מאיזה שד'}</label>
+            <div className="chip-group">
+              <button className={`chip ${side === 'right' ? 'active' : ''}`} onClick={() => setSide('right')}>ימני</button>
+              <button className={`chip ${side === 'left' ? 'active' : ''}`} onClick={() => setSide('left')}>שמאלי</button>
+              <button className={`chip ${side === 'both' ? 'active' : ''}`} onClick={() => setSide('both')}>שניהם</button>
+            </div>
+          </div>
+        )}
+
+        <div className="form-group">
+          <label className="form-label">הערות (אופציונלי)</label>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="הערה קצרה..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </div>
+
+        <button className="submit-btn" onClick={handleSave}>שמירת שינויים</button>
+      </div>
+    </div>
+  );
+};
+
 // ============== STATS VIEW ==============
 const StatsView = ({ events }) => {
   const chartRef = useRef(null);
@@ -1371,6 +1490,7 @@ const App = () => {
   const [events, setEvents] = useState([]);
   const [activeTimer, setActiveTimer] = useState(null);
   const [modalType, setModalType] = useState(null);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [toast, setToast] = useState(null);
   const [settings, setSettings] = useState({
     feedReminder: false,
@@ -1608,6 +1728,18 @@ const App = () => {
     loadEvents();
   };
 
+  const updateEvent = async (patch) => {
+    if (!editingEvent) return;
+    const { error } = await supabase.from('events').update(patch).eq('id', editingEvent.id);
+    if (error) {
+      showToast('שגיאה בעדכון');
+      return;
+    }
+    setEditingEvent(null);
+    showToast('עודכן');
+    loadEvents();
+  };
+
   const logout = async () => {
     if (confirm('להתנתק?')) {
       localStorage.removeItem('baby_tracker_active_timer');
@@ -1753,12 +1885,13 @@ const App = () => {
             return (
               <div key={e.id} className="history-item">
                 <div className="history-icon" style={{background: cfg.bg, color: cfg.color}}>{cfg.icon}</div>
-                <div className="history-content">
+                <div className="history-content" onClick={() => setEditingEvent(e)} style={{cursor: 'pointer'}}>
                   <div className="history-title">{cfg.label}{e.amount_ml ? ` · ${e.amount_ml} מ״ל` : ''}{e.side ? ` · ${e.side === 'right' ? 'ימני' : e.side === 'left' ? 'שמאלי' : 'שניהם'}` : ''}</div>
                   <div className="history-meta">{formatClock(e.started_at)}{e.duration_seconds ? ` · ${Math.floor(e.duration_seconds/60)} ד׳` : ''}</div>
                 </div>
                 <div className="history-time">{timeSince(e.started_at)}</div>
-                <button className="history-delete" onClick={() => deleteEvent(e.id)}>×</button>
+                <button className="history-edit" onClick={() => setEditingEvent(e)} aria-label="ערוך">✎</button>
+                <button className="history-delete" onClick={() => deleteEvent(e.id)} aria-label="מחק">×</button>
               </div>
             );
           })
@@ -1796,11 +1929,12 @@ const App = () => {
           return (
             <div key={e.id} className="history-item">
               <div className="history-icon" style={{background: cfg.bg, color: cfg.color}}>{cfg.icon}</div>
-              <div className="history-content">
+              <div className="history-content" onClick={() => setEditingEvent(e)} style={{cursor: 'pointer'}}>
                 <div className="history-title">{cfg.label}{e.amount_ml ? ` · ${e.amount_ml} מ״ל` : ''}{e.side ? ` · ${e.side === 'right' ? 'ימני' : e.side === 'left' ? 'שמאלי' : 'שניהם'}` : ''}</div>
                 <div className="history-meta">{formatClock(e.started_at)}{e.duration_seconds ? ` · ${Math.floor(e.duration_seconds/60)} ד׳` : ''}{e.notes ? ` · ${e.notes}` : ''}</div>
               </div>
-              <button className="history-delete" onClick={() => deleteEvent(e.id)}>×</button>
+              <button className="history-edit" onClick={() => setEditingEvent(e)} aria-label="ערוך">✎</button>
+              <button className="history-delete" onClick={() => deleteEvent(e.id)} aria-label="מחק">×</button>
             </div>
           );
         })}
@@ -1811,7 +1945,7 @@ const App = () => {
   return (
     <>
       <div className="header">
-        <h1>{profile?.baby_name || 'התינוקת שלי'} 💕</h1>
+        <h1>{profile?.baby_name || 'my baby'} 💕</h1>
         <div className="date">
           {formatHebrewDate(new Date())}
           {!isOwner && profile && <span style={{marginInlineStart: 8, padding: '2px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 10, fontSize: 11}}>שיתוף מ-{profile.full_name || profile.email}</span>}
@@ -1865,6 +1999,14 @@ const App = () => {
           type={modalType}
           onSave={addEvent}
           onClose={() => setModalType(null)}
+        />
+      )}
+
+      {editingEvent && (
+        <EditEventModal
+          event={editingEvent}
+          onSave={updateEvent}
+          onClose={() => setEditingEvent(null)}
         />
       )}
 
