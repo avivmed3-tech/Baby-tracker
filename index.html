@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFB6C9">
+<title>מעקב התינוקת שלי 💕</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+<style>
+  :root {
+    --pink-50: #FFF5F8;
+    --pink-100: #FFE8F0;
+    --pink-200: #FFD0E2;
+    --pink-300: #FFB6C9;
+    --pink-400: #FF8FB1;
+    --pink-500: #FF6B9D;
+    --pink-600: #E91E63;
+    --blue-50: #F0F7FF;
+    --blue-100: #DCEEFF;
+    --blue-200: #BBDEFB;
+    --blue-300: #90CAF9;
+    --blue-400: #64B5F6;
+    --blue-500: #42A5F5;
+    --blue-600: #1E88E5;
+    --white: #FFFFFF;
+    --cream: #FFFAFC;
+    --gray-900: #2D2438;
+    --gray-700: #5C4E6B;
+    --gray-500: #8B7B9A;
+    --gray-300: #D4CBDE;
+    --shadow-pink: 0 8px 24px rgba(255, 143, 177, 0.18);
+    --shadow-blue: 0 8px 24px rgba(100, 181, 246, 0.18);
+    --shadow-soft: 0 4px 16px rgba(45, 36, 56, 0.06);
+    --gradient-main: linear-gradient(135deg, #FFE8F0 0%, #F0F7FF 100%);
+    --gradient-pink: linear-gradient(135deg, #FF8FB1 0%, #FF6B9D 100%);
+    --gradient-blue: linear-gradient(135deg, #90CAF9 0%, #64B5F6 100%);
+    --gradient-mix: linear-gradient(135deg, #FFB6C9 0%, #BBDEFB 100%);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    overscroll-behavior: none;
+  }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--gradient-main);
+    min-height: 100vh;
+    color: var(--gray-900);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    right: -20%;
+    width: 70%;
+    height: 70%;
+    background: radial-gradient(circle, rgba(255, 182, 201, 0.4) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -30%;
+    left: -20%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle, rgba(187, 222, 251, 0.4) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    padding-bottom: 90px;
+  }
+
+  .display-font {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Header */
+  .header {
+    padding: 24px 20px 16px;
+    text-align: center;
+    position: relative;
+  }
+
+  .header h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #FF6B9D 0%, #64B5F6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 4px;
+  }
+
+  .header .date {
+    font-size: 14px;
+    color: var(--gray-500);
+    font-weight: 500;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex-shrink: 0;
+    padding: 10px 18px;
+    background: var(--white);
+    border: none;
+    border-radius: 100px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all 0.25s;
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tab.active {
+    background: var(--gradient-pink);
+    color: white;
+    box-shadow: var(--shadow-pink);
+    transform: translateY(-1px);
+  }
+
+  /* Cards */
+  .card {
+    background: var(--white);
+    border-radius: 24px;
+    padding: 20px;
+    margin: 0 16px 16px;
+    box-shadow: var(--shadow-soft);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--gray-900);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Quick Actions Grid */
+  .quick-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 0 16px 16px;
+  }
+
+  .quick-btn {
+    background: var(--white);
+    border: none;
+    border-radius: 20px;
+    padding: 20px 16px;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: var(--shadow-soft);
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+    text-align: right;
+  }
+
+  .quick-btn:active {
+    transform: scale(0.97);
+  }
+
+  .quick-btn-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .quick-btn-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 2px;
+  }
+
+  .quick-btn-sub {
+    font-size: 12px;
+    color: var(--gray-500);
+    font-weight: 500;
+  }
+
+  .quick-btn.pink {
+    background: linear-gradient(135deg, #FFE8F0 0%, #FFD0E2 100%);
+  }
+  .quick-btn.blue {
+    background: linear-gradient(135deg, #DCEEFF 0%, #BBDEFB 100%);
+  }
+  .quick-btn.mix {
+    background: linear-gradient(135deg, #FFE8F0 0%, #DCEEFF 100%);
+  }
+  .quick-btn.cream {
+    background: linear-gradient(135deg, #FFF5F8 0%, #FFFAFC 100%);
+  }
+
+  /* Timer Card */
+  .timer-card {
+    background: var(--gradient-pink);
+    color: white;
+    border-radius: 28px;
+    padding: 24px;
+    margin: 0 16px 16px;
+    box-shadow: var(--shadow-pink);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .timer-card.blue { background: var(--gradient-blue); box-shadow: var(--shadow-blue); }
+
+  .timer-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -20%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .timer-label {
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.9;
+    margin-bottom: 8px;
+    position: relative;
+  }
+
+  .timer-display {
+    font-family: 'Fraunces', serif;
+    font-size: 52px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    margin-bottom: 16px;
+    font-variant-numeric: tabular-nums;
+    position: relative;
+  }
+
+  .timer-actions {
+    display: flex;
+    gap: 8px;
+    position: relative;
+  }
+
+  .timer-btn {
+    flex: 1;
+    background: rgba(255,255,255,0.25);
+    border: 1.5px solid rgba(255,255,255,0.4);
+    color: white;
+    padding: 12px;
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+  }
+
+  .timer-btn:active { transform: scale(0.96); }
+  .timer-btn.solid { background: white; color: var(--pink-600); border-color: white; }
+  .timer-card.blue .timer-btn.solid { color: var(--blue-600); }
+
+  .side-toggle {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+
+  .side-btn {
+    flex: 1;
+    background: rgba(255,255,255,0.2);
+    border: 1.5px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 8px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .side-btn.active {
+    background: white;
+    color: var(--pink-600);
+  }
+  .timer-card.blue .side-btn.active { color: var(--blue-600); }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .stat-box {
+    background: var(--cream);
+    border-radius: 14px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--pink-600);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-box.blue .stat-value { color: var(--blue-600); }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--gray-500);
+    font-weight: 600;
+  }
+
+  /* History List */
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--pink-50);
+  }
+  .history-item:last-child { border-bottom: none; }
+
+  .history-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .history-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .history-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 2px;
+  }
+
+  .history-meta {
+    font-size: 12px;
+    color: var(--gray-500);
+  }
+
+  .history-time {
+    font-size: 12px;
+    color: var(--gray-500);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .history-delete {
+    background: none;
+    border: none;
+    color: var(--gray-300);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .history-delete:active { color: var(--pink-500); }
+
+  /* Bottom Nav */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 182, 201, 0.2);
+    padding: 8px 16px 22px;
+    display: flex;
+    justify-content: space-around;
+    z-index: 100;
+  }
+
+  .nav-btn {
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--gray-500);
+    transition: color 0.2s;
+  }
+
+  .nav-btn.active { color: var(--pink-500); }
+  .nav-btn-icon { font-size: 22px; }
+  .nav-btn-label { font-size: 11px; font-weight: 600; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(45, 36, 56, 0.5);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 200;
+    animation: fadeIn 0.2s;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  .modal {
+    background: var(--white);
+    width: 100%;
+    max-width: 500px;
+    border-radius: 28px 28px 0 0;
+    padding: 24px 20px 32px;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .modal-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--gray-300);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+
+  .modal-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 8px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--pink-100);
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 15px;
+    background: var(--cream);
+    color: var(--gray-900);
+    transition: border-color 0.2s;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--pink-400);
+    background: white;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .chip-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    flex: 1;
+    min-width: 80px;
+    padding: 12px;
+    background: var(--cream);
+    border: 1.5px solid var(--pink-100);
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .chip.active {
+    background: var(--gradient-pink);
+    color: white;
+    border-color: transparent;
+  }
+  .chip.active.blue {
+    background: var(--gradient-blue);
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--gradient-pink);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--shadow-pink);
+    margin-top: 8px;
+  }
+
+  .submit-btn:active { transform: scale(0.98); }
+
+  /* Empty State */
+  .empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--gray-500);
+  }
+  .empty-emoji { font-size: 48px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; }
+
+  /* Auth */
+  .auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .auth-card {
+    background: white;
+    border-radius: 28px;
+    padding: 32px 24px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 20px 60px rgba(255, 143, 177, 0.2);
+    text-align: center;
+  }
+
+  .auth-emoji {
+    font-size: 60px;
+    margin-bottom: 12px;
+  }
+
+  .auth-title {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #FF6B9D 0%, #64B5F6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .auth-sub {
+    font-size: 14px;
+    color: var(--gray-500);
+    margin-bottom: 24px;
+  }
+
+  .auth-toggle {
+    margin-top: 16px;
+    background: none;
+    border: none;
+    color: var(--pink-500);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--gray-900);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 300;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    animation: toastSlide 0.3s;
+  }
+
+  @keyframes toastSlide {
+    from { transform: translate(-50%, 100%); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+
+  /* Chart container */
+  .chart-wrap {
+    position: relative;
+    height: 200px;
+    margin-top: 8px;
+  }
+
+  /* Pulse animation for active timer */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  .pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    color: var(--pink-500);
+  }
+
+  /* Settings */
+  .setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--pink-50);
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 14px; font-weight: 600; color: var(--gray-900); }
+  .setting-desc { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+
+  .switch {
+    position: relative;
+    width: 48px;
+    height: 28px;
+    background: var(--gray-300);
+    border-radius: 100px;
+    cursor: pointer;
+    transition: background 0.25s;
+    flex-shrink: 0;
+  }
+  .switch.on { background: var(--pink-400); }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 22px;
+    height: 22px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.25s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .switch.on::after { transform: translateX(-20px); }
+
+  /* Setup screen */
+  .setup-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--pink-200);
+    border-radius: 14px;
+    font-family: inherit;
+    font-size: 14px;
+    background: var(--cream);
+    margin-bottom: 10px;
+    text-align: right;
+    direction: ltr;
+  }
+  .setup-help {
+    background: var(--blue-50);
+    border-radius: 14px;
+    padding: 12px;
+    font-size: 12px;
+    color: var(--gray-700);
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .setup-help code {
+    background: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+// ============== SUPABASE SETUP ==============
+const SUPABASE_CONFIG_KEY = 'baby_tracker_supabase_config';
+const AUTH_KEY = 'baby_tracker_auth';
+const SETTINGS_KEY = 'baby_tracker_settings';
+
+let supabase = null;
+
+const initSupabase = (url, key) => {
+  if (url && key && window.supabase) {
+    supabase = window.supabase.createClient(url, key);
+    return true;
+  }
+  return false;
+};
+
+// ============== UTILS ==============
+const formatTime = (seconds) => {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+const formatHebrewDate = (date) => {
+  const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+  const months = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+  return `יום ${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
+};
+
+const timeSince = (timestamp) => {
+  const seconds = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
+  if (seconds < 60) return 'עכשיו';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `לפני ${minutes} ד׳`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `לפני ${hours} ש׳`;
+  const days = Math.floor(hours / 24);
+  return `לפני ${days} י׳`;
+};
+
+const formatClock = (timestamp) => {
+  const d = new Date(timestamp);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+const EVENT_TYPES = {
+  nursing: { label: 'הנקה', icon: '🤱', color: '#FF6B9D', bg: '#FFE8F0' },
+  bottle: { label: 'בקבוק', icon: '🍼', color: '#FF8FB1', bg: '#FFE8F0' },
+  pumping: { label: 'שאיבה', icon: '💧', color: '#64B5F6', bg: '#DCEEFF' },
+  pee: { label: 'פיפי', icon: '💛', color: '#FFA726', bg: '#FFF3E0' },
+  poo: { label: 'קקי', icon: '💩', color: '#8D6E63', bg: '#EFEBE9' },
+  sleep: { label: 'שינה', icon: '😴', color: '#9575CD', bg: '#EDE7F6' }
+};
+
+// ============== SETUP SCREEN ==============
+const SetupScreen = ({ onSetup }) => {
+  const [url, setUrl] = useState('');
+  const [key, setKey] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = () => {
+    if (!url.trim() || !key.trim()) {
+      setError('יש למלא את שני השדות');
+      return;
+    }
+    if (!url.includes('supabase.co')) {
+      setError('כתובת Supabase לא תקינה');
+      return;
+    }
+    localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify({ url: url.trim(), key: key.trim() }));
+    onSetup({ url: url.trim(), key: key.trim() });
+  };
+
+  return (
+    <div className="auth-container">
+      <div className="auth-card">
+        <div className="auth-emoji">🍼</div>
+        <h1 className="auth-title">חיבור ל-Supabase</h1>
+        <p className="auth-sub">חיבור ראשוני לבסיס הנתונים</p>
+
+        <div className="setup-help">
+          <strong>הוראות התקנה:</strong><br/>
+          1. הירשם ל-<code>supabase.com</code><br/>
+          2. צור פרויקט חדש<br/>
+          3. תחת Settings → API העתק:<br/>
+          &nbsp;&nbsp;• Project URL<br/>
+          &nbsp;&nbsp;• anon public key<br/>
+          4. הרץ את ה-SQL שמתחת בטאב SQL Editor
+        </div>
+
+        <input
+          className="setup-input"
+          placeholder="https://xxx.supabase.co"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+        />
+        <input
+          className="setup-input"
+          placeholder="anon public key (eyJ...)"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+        />
+
+        {error && <p style={{color: '#FF6B9D', fontSize: 13, marginBottom: 10}}>{error}</p>}
+
+        <button className="submit-btn" onClick={handleSubmit}>חיבור</button>
+
+        <details style={{marginTop: 16, textAlign: 'right'}}>
+          <summary style={{fontSize: 12, color: '#8B7B9A', cursor: 'pointer', fontWeight: 600}}>הצג SQL להתקנה</summary>
+          <pre style={{fontSize: 10, background: '#FFF5F8', padding: 12, borderRadius: 8, marginTop: 8, overflow: 'auto', direction: 'ltr', textAlign: 'left'}}>{`-- Users table
+CREATE TABLE users (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  baby_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Events table
+CREATE TABLE events (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  ended_at TIMESTAMPTZ,
+  duration_seconds INT,
+  amount_ml INT,
+  side TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_events_user_started 
+  ON events(user_id, started_at DESC);
+
+-- Allow anon access (we handle auth in app)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "anon all users" ON users
+  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon all events" ON events
+  FOR ALL USING (true) WITH CHECK (true);`}</pre>
+        </details>
+      </div>
+    </div>
+  );
+};
+
+// ============== AUTH ==============
+const hashPassword = async (password) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + 'baby_tracker_salt_2026');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+const AuthScreen = ({ onLogin }) => {
+  const [mode, setMode] = useState('login');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [babyName, setBabyName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setError('');
+    if (!username.trim() || !password.trim()) {
+      setError('יש למלא את כל השדות');
+      return;
+    }
+    if (password.length < 4) {
+      setError('סיסמה חייבת להיות לפחות 4 תווים');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const passHash = await hashPassword(password);
+
+      if (mode === 'signup') {
+        const { data: existing } = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', username.trim().toLowerCase())
+          .maybeSingle();
+
+        if (existing) {
+          setError('שם המשתמש כבר תפוס');
+          setLoading(false);
+          return;
+        }
+
+        const { data, error: signupError } = await supabase
+          .from('users')
+          .insert([{
+            username: username.trim().toLowerCase(),
+            password_hash: passHash,
+            baby_name: babyName.trim() || 'התינוקת'
+          }])
+          .select()
+          .single();
+
+        if (signupError) throw signupError;
+        localStorage.setItem(AUTH_KEY, JSON.stringify(data));
+        onLogin(data);
+      } else {
+        const { data, error: loginError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', username.trim().toLowerCase())
+          .eq('password_hash', passHash)
+          .maybeSingle();
+
+        if (loginError) throw loginError;
+        if (!data) {
+          setError('שם משתמש או סיסמה שגויים');
+          setLoading(false);
+          return;
+        }
+
+        localStorage.setItem(AUTH_KEY, JSON.stringify(data));
+        onLogin(data);
+      }
+    } catch (err) {
+      setError('שגיאה: ' + (err.message || 'נסה שוב'));
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="auth-container">
+      <div className="auth-card">
+        <div className="auth-emoji">{mode === 'signup' ? '🌸' : '💕'}</div>
+        <h1 className="auth-title">{mode === 'signup' ? 'הרשמה' : 'ברוכים השבים'}</h1>
+        <p className="auth-sub">{mode === 'signup' ? 'צרי חשבון חדש למעקב' : 'התחברי לחשבון שלך'}</p>
+
+        <input
+          className="setup-input"
+          placeholder="שם משתמש"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          autoComplete="username"
+        />
+        <input
+          className="setup-input"
+          type="password"
+          placeholder="סיסמה"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+        />
+        {mode === 'signup' && (
+          <input
+            className="setup-input"
+            placeholder="שם התינוקת (אופציונלי)"
+            value={babyName}
+            onChange={(e) => setBabyName(e.target.value)}
+            style={{direction: 'rtl', textAlign: 'right'}}
+          />
+        )}
+
+        {error && <p style={{color: '#FF6B9D', fontSize: 13, marginBottom: 10}}>{error}</p>}
+
+        <button className="submit-btn" onClick={handleSubmit} disabled={loading}>
+          {loading ? 'טוען...' : (mode === 'signup' ? 'יצירת חשבון' : 'התחברות')}
+        </button>
+
+        <button className="auth-toggle" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); }}>
+          {mode === 'login' ? 'אין לך חשבון? הרשמה' : 'יש לך חשבון? התחברות'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ============== TIMER COMPONENT ==============
+const ActiveTimer = ({ activeTimer, onStop, onCancel }) => {
+  const [elapsed, setElapsed] = useState(0);
+  const [side, setSide] = useState(activeTimer.side || 'right');
+
+  useEffect(() => {
+    const start = new Date(activeTimer.startedAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [activeTimer.startedAt]);
+
+  const config = EVENT_TYPES[activeTimer.type];
+  const isPumping = activeTimer.type === 'pumping';
+  const isNursing = activeTimer.type === 'nursing';
+
+  return (
+    <div className={`timer-card ${isPumping ? 'blue' : ''}`}>
+      <div className="timer-label">
+        <span className="pulse">●</span> {config.icon} {config.label} - פעיל
+      </div>
+      <div className="timer-display">{formatTime(elapsed)}</div>
+
+      {isNursing && (
+        <div className="side-toggle">
+          <button
+            className={`side-btn ${side === 'right' ? 'active' : ''}`}
+            onClick={() => setSide('right')}
+          >שד ימני</button>
+          <button
+            className={`side-btn ${side === 'left' ? 'active' : ''}`}
+            onClick={() => setSide('left')}
+          >שד שמאלי</button>
+          <button
+            className={`side-btn ${side === 'both' ? 'active' : ''}`}
+            onClick={() => setSide('both')}
+          >שניהם</button>
+        </div>
+      )}
+
+      <div className="timer-actions">
+        <button className="timer-btn" onClick={onCancel}>ביטול</button>
+        <button className="timer-btn solid" onClick={() => onStop(side)}>סיום ✓</button>
+      </div>
+    </div>
+  );
+};
+
+// ============== ADD EVENT MODAL ==============
+const AddEventModal = ({ type, onSave, onClose }) => {
+  const config = EVENT_TYPES[type];
+  const [amount, setAmount] = useState('');
+  const [side, setSide] = useState('right');
+  const [duration, setDuration] = useState('');
+  const [notes, setNotes] = useState('');
+  const [time, setTime] = useState(() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  });
+
+  const handleSave = () => {
+    const [hh, mm] = time.split(':');
+    const startedAt = new Date();
+    startedAt.setHours(parseInt(hh), parseInt(mm), 0, 0);
+
+    const event = {
+      event_type: type,
+      started_at: startedAt.toISOString(),
+      notes: notes.trim() || null
+    };
+
+    if (type === 'bottle' || type === 'pumping') {
+      event.amount_ml = parseInt(amount) || null;
+      if (duration) {
+        event.duration_seconds = parseInt(duration) * 60;
+        event.ended_at = new Date(startedAt.getTime() + parseInt(duration) * 60000).toISOString();
+      }
+    }
+    if (type === 'nursing') {
+      event.side = side;
+      if (duration) {
+        event.duration_seconds = parseInt(duration) * 60;
+        event.ended_at = new Date(startedAt.getTime() + parseInt(duration) * 60000).toISOString();
+      }
+    }
+    if (type === 'pumping') {
+      event.side = side;
+    }
+
+    onSave(event);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-handle"></div>
+        <h2 className="modal-title">{config.icon} הוספת {config.label}</h2>
+
+        <div className="form-group">
+          <label className="form-label">שעה</label>
+          <input
+            type="time"
+            className="form-input"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+          />
+        </div>
+
+        {(type === 'bottle' || type === 'pumping') && (
+          <div className="form-group">
+            <label className="form-label">כמות (מ״ל)</label>
+            <input
+              type="number"
+              className="form-input"
+              placeholder="לדוגמה: 120"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="numeric"
+            />
+          </div>
+        )}
+
+        {(type === 'nursing' || type === 'pumping') && (
+          <div className="form-group">
+            <label className="form-label">{type === 'nursing' ? 'איזה צד' : 'מאיזה שד'}</label>
+            <div className="chip-group">
+              <button className={`chip ${side === 'right' ? 'active' : ''}`} onClick={() => setSide('right')}>ימני</button>
+              <button className={`chip ${side === 'left' ? 'active' : ''}`} onClick={() => setSide('left')}>שמאלי</button>
+              <button className={`chip ${side === 'both' ? 'active' : ''}`} onClick={() => setSide('both')}>שניהם</button>
+            </div>
+          </div>
+        )}
+
+        {(type === 'nursing' || type === 'pumping' || type === 'bottle') && (
+          <div className="form-group">
+            <label className="form-label">משך (דקות) - אופציונלי</label>
+            <input
+              type="number"
+              className="form-input"
+              placeholder="לדוגמה: 15"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              inputMode="numeric"
+            />
+          </div>
+        )}
+
+        <div className="form-group">
+          <label className="form-label">הערות (אופציונלי)</label>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="הערה קצרה..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </div>
+
+        <button className="submit-btn" onClick={handleSave}>שמירה</button>
+      </div>
+    </div>
+  );
+};
+
+// ============== STATS VIEW ==============
+const StatsView = ({ events }) => {
+  const chartRef = useRef(null);
+  const chartInstance = useRef(null);
+
+  const stats = useMemo(() => {
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - (6 - i));
+      return d;
+    });
+
+    const dailyData = last7Days.map(day => {
+      const nextDay = new Date(day);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const dayEvents = events.filter(e => {
+        const t = new Date(e.started_at);
+        return t >= day && t < nextDay;
+      });
+
+      return {
+        date: day,
+        feeds: dayEvents.filter(e => ['nursing', 'bottle'].includes(e.event_type)).length,
+        pumping: dayEvents.filter(e => e.event_type === 'pumping').length,
+        pumpingMl: dayEvents.filter(e => e.event_type === 'pumping').reduce((s, e) => s + (e.amount_ml || 0), 0),
+        pee: dayEvents.filter(e => e.event_type === 'pee').length,
+        poo: dayEvents.filter(e => e.event_type === 'poo').length,
+      };
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayEvents = events.filter(e => new Date(e.started_at) >= today);
+
+    return {
+      dailyData,
+      today: {
+        feeds: todayEvents.filter(e => ['nursing', 'bottle'].includes(e.event_type)).length,
+        pumping: todayEvents.filter(e => e.event_type === 'pumping').length,
+        pumpingMl: todayEvents.filter(e => e.event_type === 'pumping').reduce((s, e) => s + (e.amount_ml || 0), 0),
+        pee: todayEvents.filter(e => e.event_type === 'pee').length,
+        poo: todayEvents.filter(e => e.event_type === 'poo').length,
+      }
+    };
+  }, [events]);
+
+  useEffect(() => {
+    if (!chartRef.current || !window.Chart) return;
+
+    if (chartInstance.current) chartInstance.current.destroy();
+
+    const ctx = chartRef.current.getContext('2d');
+    const labels = stats.dailyData.map(d => ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'][d.date.getDay()]);
+
+    chartInstance.current = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'האכלות',
+            data: stats.dailyData.map(d => d.feeds),
+            backgroundColor: '#FF8FB1',
+            borderRadius: 8,
+          },
+          {
+            label: 'שאיבות',
+            data: stats.dailyData.map(d => d.pumping),
+            backgroundColor: '#64B5F6',
+            borderRadius: 8,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { family: 'Heebo', size: 12 }, usePointStyle: true, padding: 12 }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { family: 'Heebo', size: 11 } } },
+          y: { beginAtZero: true, grid: { color: '#FFE8F0' }, ticks: { font: { family: 'Heebo', size: 11 }, precision: 0 } }
+        }
+      }
+    });
+
+    return () => { if (chartInstance.current) chartInstance.current.destroy(); };
+  }, [stats]);
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-title">📊 היום</div>
+        <div className="stats-grid">
+          <div className="stat-box">
+            <div className="stat-value">{stats.today.feeds}</div>
+            <div className="stat-label">האכלות</div>
+          </div>
+          <div className="stat-box blue">
+            <div className="stat-value">{stats.today.pumping}</div>
+            <div className="stat-label">שאיבות</div>
+          </div>
+          <div className="stat-box blue">
+            <div className="stat-value">{stats.today.pumpingMl}</div>
+            <div className="stat-label">מ״ל נשאבו</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-value">{stats.today.pee + stats.today.poo}</div>
+            <div className="stat-label">החתלות</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">📈 7 ימים אחרונים</div>
+        <div className="chart-wrap">
+          <canvas ref={chartRef}></canvas>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">💡 ממוצעים שבועיים</div>
+        <div className="stats-grid">
+          <div className="stat-box">
+            <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.feeds, 0) / 7)}</div>
+            <div className="stat-label">האכלות ביום</div>
+          </div>
+          <div className="stat-box blue">
+            <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.pumpingMl, 0) / 7)}</div>
+            <div className="stat-label">מ״ל ביום</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.pee, 0) / 7)}</div>
+            <div className="stat-label">פיפי ביום</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.poo, 0) / 7)}</div>
+            <div className="stat-label">קקי ביום</div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ============== SETTINGS VIEW ==============
+const SettingsView = ({ user, settings, onUpdateSettings, onLogout, onResetSupabase }) => {
+  const updateSetting = (key, value) => {
+    const newSettings = { ...settings, [key]: value };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+    onUpdateSettings(newSettings);
+  };
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-title">👶 פרטי התינוקת</div>
+        <div className="setting-row">
+          <div>
+            <div className="setting-label">שם</div>
+            <div className="setting-desc">{user.baby_name || 'לא הוגדר'}</div>
+          </div>
+        </div>
+        <div className="setting-row">
+          <div>
+            <div className="setting-label">משתמש</div>
+            <div className="setting-desc">{user.username}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">🔔 תזכורות</div>
+        <div className="setting-row">
+          <div>
+            <div className="setting-label">תזכורת האכלה</div>
+            <div className="setting-desc">התראה אחרי 3 שעות מההאכלה האחרונה</div>
+          </div>
+          <div
+            className={`switch ${settings.feedReminder ? 'on' : ''}`}
+            onClick={() => updateSetting('feedReminder', !settings.feedReminder)}
+          ></div>
+        </div>
+        <div className="setting-row">
+          <div>
+            <div className="setting-label">תזכורת שאיבה</div>
+            <div className="setting-desc">התראה אחרי 3 שעות מהשאיבה האחרונה</div>
+          </div>
+          <div
+            className={`switch ${settings.pumpReminder ? 'on' : ''}`}
+            onClick={() => updateSetting('pumpReminder', !settings.pumpReminder)}
+          ></div>
+        </div>
+        <div className="setting-row">
+          <div>
+            <div className="setting-label">קול בסיום טיימר</div>
+            <div className="setting-desc">השמעת צליל בסיום טיימר</div>
+          </div>
+          <div
+            className={`switch ${settings.timerSound ? 'on' : ''}`}
+            onClick={() => updateSetting('timerSound', !settings.timerSound)}
+          ></div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">⚙️ חשבון</div>
+        <button
+          style={{width: '100%', padding: '14px', background: '#FFE8F0', color: '#E91E63', border: 'none', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, marginBottom: 8, cursor: 'pointer'}}
+          onClick={onLogout}
+        >יציאה</button>
+        <button
+          style={{width: '100%', padding: '14px', background: '#F5F5F5', color: '#5C4E6B', border: 'none', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer'}}
+          onClick={onResetSupabase}
+        >החלפת חיבור Supabase</button>
+      </div>
+    </>
+  );
+};
+
+// ============== MAIN APP ==============
+const App = () => {
+  const [supabaseConfig, setSupabaseConfig] = useState(null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('home');
+  const [events, setEvents] = useState([]);
+  const [activeTimer, setActiveTimer] = useState(null);
+  const [modalType, setModalType] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [settings, setSettings] = useState({
+    feedReminder: false,
+    pumpReminder: false,
+    timerSound: true
+  });
+
+  // Init
+  useEffect(() => {
+    const savedConfig = localStorage.getItem(SUPABASE_CONFIG_KEY);
+    if (savedConfig) {
+      const config = JSON.parse(savedConfig);
+      if (initSupabase(config.url, config.key)) {
+        setSupabaseConfig(config);
+        const savedUser = localStorage.getItem(AUTH_KEY);
+        if (savedUser) setUser(JSON.parse(savedUser));
+        const savedSettings = localStorage.getItem(SETTINGS_KEY);
+        if (savedSettings) setSettings(JSON.parse(savedSettings));
+        const savedTimer = localStorage.getItem('baby_tracker_active_timer');
+        if (savedTimer) setActiveTimer(JSON.parse(savedTimer));
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  // Load events
+  useEffect(() => {
+    if (user) loadEvents();
+  }, [user]);
+
+  const loadEvents = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('started_at', { ascending: false })
+      .limit(200);
+    if (!error) setEvents(data || []);
+  };
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2000);
+  };
+
+  const startTimer = (type) => {
+    if (activeTimer) {
+      showToast('יש כבר טיימר פעיל');
+      return;
+    }
+    const timer = {
+      type,
+      startedAt: new Date().toISOString(),
+      side: type === 'nursing' ? 'right' : null
+    };
+    setActiveTimer(timer);
+    localStorage.setItem('baby_tracker_active_timer', JSON.stringify(timer));
+    showToast(`טיימר ${EVENT_TYPES[type].label} התחיל`);
+  };
+
+  const stopTimer = async (side) => {
+    if (!activeTimer) return;
+    const endedAt = new Date();
+    const startedAt = new Date(activeTimer.startedAt);
+    const duration = Math.floor((endedAt - startedAt) / 1000);
+
+    if (activeTimer.type === 'pumping') {
+      // For pumping, prompt for amount
+      const amount = prompt('כמה מ״ל נשאבו?');
+      const event = {
+        user_id: user.id,
+        event_type: activeTimer.type,
+        started_at: activeTimer.startedAt,
+        ended_at: endedAt.toISOString(),
+        duration_seconds: duration,
+        side: side,
+        amount_ml: amount ? parseInt(amount) : null
+      };
+      await supabase.from('events').insert([event]);
+    } else {
+      const event = {
+        user_id: user.id,
+        event_type: activeTimer.type,
+        started_at: activeTimer.startedAt,
+        ended_at: endedAt.toISOString(),
+        duration_seconds: duration,
+        side: activeTimer.type === 'nursing' ? side : null
+      };
+      await supabase.from('events').insert([event]);
+    }
+
+    if (settings.timerSound) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 800; gain.gain.value = 0.1;
+        osc.start(); osc.stop(ctx.currentTime + 0.15);
+        setTimeout(() => {
+          const o2 = ctx.createOscillator(); const g2 = ctx.createGain();
+          o2.connect(g2); g2.connect(ctx.destination);
+          o2.frequency.value = 1000; g2.gain.value = 0.1;
+          o2.start(); o2.stop(ctx.currentTime + 0.15);
+        }, 180);
+      } catch(e) {}
+    }
+
+    setActiveTimer(null);
+    localStorage.removeItem('baby_tracker_active_timer');
+    showToast(`נשמר! ${formatTime(duration)}`);
+    loadEvents();
+  };
+
+  const cancelTimer = () => {
+    if (confirm('לבטל את הטיימר?')) {
+      setActiveTimer(null);
+      localStorage.removeItem('baby_tracker_active_timer');
+    }
+  };
+
+  const quickAdd = async (type) => {
+    const event = {
+      user_id: user.id,
+      event_type: type,
+      started_at: new Date().toISOString()
+    };
+    await supabase.from('events').insert([event]);
+    showToast(`${EVENT_TYPES[type].icon} ${EVENT_TYPES[type].label} נרשם`);
+    loadEvents();
+  };
+
+  const addEvent = async (event) => {
+    await supabase.from('events').insert([{ ...event, user_id: user.id }]);
+    setModalType(null);
+    showToast('נשמר בהצלחה');
+    loadEvents();
+  };
+
+  const deleteEvent = async (id) => {
+    if (!confirm('למחוק את הרישום?')) return;
+    await supabase.from('events').delete().eq('id', id);
+    showToast('נמחק');
+    loadEvents();
+  };
+
+  const logout = () => {
+    if (confirm('להתנתק?')) {
+      localStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem('baby_tracker_active_timer');
+      setUser(null);
+      setEvents([]);
+      setActiveTimer(null);
+    }
+  };
+
+  const resetSupabase = () => {
+    if (confirm('להחליף חיבור Supabase? תצטרך להתחבר מחדש')) {
+      localStorage.removeItem(SUPABASE_CONFIG_KEY);
+      localStorage.removeItem(AUTH_KEY);
+      window.location.reload();
+    }
+  };
+
+  // Calculate last events for "time since"
+  const lastByType = useMemo(() => {
+    const result = {};
+    for (const e of events) {
+      if (!result[e.event_type]) result[e.event_type] = e;
+    }
+    return result;
+  }, [events]);
+
+  if (loading) {
+    return <div className="loading">טוען... 💕</div>;
+  }
+
+  if (!supabaseConfig) {
+    return <SetupScreen onSetup={(config) => setSupabaseConfig(config)} />;
+  }
+
+  if (!user) {
+    return <AuthScreen onLogin={(u) => setUser(u)} />;
+  }
+
+  // ============== RENDER VIEWS ==============
+  const renderHome = () => (
+    <>
+      {activeTimer && (
+        <ActiveTimer
+          activeTimer={activeTimer}
+          onStop={stopTimer}
+          onCancel={cancelTimer}
+        />
+      )}
+
+      <div className="quick-grid">
+        <button className="quick-btn pink" onClick={() => activeTimer ? showToast('יש טיימר פעיל') : startTimer('nursing')}>
+          <span className="quick-btn-icon">🤱</span>
+          <div className="quick-btn-title">הנקה</div>
+          <div className="quick-btn-sub">{lastByType.nursing ? timeSince(lastByType.nursing.started_at) : 'התחל טיימר'}</div>
+        </button>
+        <button className="quick-btn blue" onClick={() => activeTimer ? showToast('יש טיימר פעיל') : startTimer('pumping')}>
+          <span className="quick-btn-icon">💧</span>
+          <div className="quick-btn-title">שאיבה</div>
+          <div className="quick-btn-sub">{lastByType.pumping ? timeSince(lastByType.pumping.started_at) : 'התחל טיימר'}</div>
+        </button>
+        <button className="quick-btn mix" onClick={() => setModalType('bottle')}>
+          <span className="quick-btn-icon">🍼</span>
+          <div className="quick-btn-title">בקבוק</div>
+          <div className="quick-btn-sub">{lastByType.bottle ? timeSince(lastByType.bottle.started_at) : 'הוספה ידנית'}</div>
+        </button>
+        <button className="quick-btn cream" onClick={() => quickAdd('pee')}>
+          <span className="quick-btn-icon">💛</span>
+          <div className="quick-btn-title">פיפי</div>
+          <div className="quick-btn-sub">{lastByType.pee ? timeSince(lastByType.pee.started_at) : 'הוספה מהירה'}</div>
+        </button>
+        <button className="quick-btn cream" onClick={() => quickAdd('poo')}>
+          <span className="quick-btn-icon">💩</span>
+          <div className="quick-btn-title">קקי</div>
+          <div className="quick-btn-sub">{lastByType.poo ? timeSince(lastByType.poo.started_at) : 'הוספה מהירה'}</div>
+        </button>
+        <button className="quick-btn mix" onClick={() => setModalType('sleep')}>
+          <span className="quick-btn-icon">😴</span>
+          <div className="quick-btn-title">שינה</div>
+          <div className="quick-btn-sub">{lastByType.sleep ? timeSince(lastByType.sleep.started_at) : 'הוספה ידנית'}</div>
+        </button>
+      </div>
+
+      <div className="card">
+        <div className="card-title">🕐 פעילות אחרונה</div>
+        {events.length === 0 ? (
+          <div className="empty">
+            <div className="empty-emoji">🌸</div>
+            <div className="empty-text">עדיין אין רישומים<br/>התחילי במעקב על ידי לחיצה על אחד הכפתורים</div>
+          </div>
+        ) : (
+          events.slice(0, 8).map(e => {
+            const cfg = EVENT_TYPES[e.event_type];
+            return (
+              <div key={e.id} className="history-item">
+                <div className="history-icon" style={{background: cfg.bg, color: cfg.color}}>{cfg.icon}</div>
+                <div className="history-content">
+                  <div className="history-title">{cfg.label}{e.amount_ml ? ` · ${e.amount_ml} מ״ל` : ''}{e.side ? ` · ${e.side === 'right' ? 'ימני' : e.side === 'left' ? 'שמאלי' : 'שניהם'}` : ''}</div>
+                  <div className="history-meta">{formatClock(e.started_at)}{e.duration_seconds ? ` · ${Math.floor(e.duration_seconds/60)} ד׳` : ''}</div>
+                </div>
+                <div className="history-time">{timeSince(e.started_at)}</div>
+                <button className="history-delete" onClick={() => deleteEvent(e.id)}>×</button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
+  );
+
+  const renderHistory = () => {
+    const grouped = {};
+    events.forEach(e => {
+      const date = new Date(e.started_at);
+      date.setHours(0,0,0,0);
+      const key = date.toISOString();
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(e);
+    });
+
+    if (Object.keys(grouped).length === 0) {
+      return (
+        <div className="card">
+          <div className="empty">
+            <div className="empty-emoji">📋</div>
+            <div className="empty-text">אין היסטוריה עדיין</div>
+          </div>
+        </div>
+      );
+    }
+
+    return Object.entries(grouped).map(([dateKey, dayEvents]) => (
+      <div key={dateKey} className="card">
+        <div className="card-title">📅 {formatHebrewDate(new Date(dateKey))}</div>
+        {dayEvents.map(e => {
+          const cfg = EVENT_TYPES[e.event_type];
+          return (
+            <div key={e.id} className="history-item">
+              <div className="history-icon" style={{background: cfg.bg, color: cfg.color}}>{cfg.icon}</div>
+              <div className="history-content">
+                <div className="history-title">{cfg.label}{e.amount_ml ? ` · ${e.amount_ml} מ״ל` : ''}{e.side ? ` · ${e.side === 'right' ? 'ימני' : e.side === 'left' ? 'שמאלי' : 'שניהם'}` : ''}</div>
+                <div className="history-meta">{formatClock(e.started_at)}{e.duration_seconds ? ` · ${Math.floor(e.duration_seconds/60)} ד׳` : ''}{e.notes ? ` · ${e.notes}` : ''}</div>
+              </div>
+              <button className="history-delete" onClick={() => deleteEvent(e.id)}>×</button>
+            </div>
+          );
+        })}
+      </div>
+    ));
+  };
+
+  return (
+    <>
+      <div className="header">
+        <h1>{user.baby_name || 'התינוקת שלי'} 💕</h1>
+        <div className="date">{formatHebrewDate(new Date())}</div>
+      </div>
+
+      {view === 'home' && renderHome()}
+      {view === 'stats' && <StatsView events={events} />}
+      {view === 'history' && renderHistory()}
+      {view === 'settings' && (
+        <SettingsView
+          user={user}
+          settings={settings}
+          onUpdateSettings={setSettings}
+          onLogout={logout}
+          onResetSupabase={resetSupabase}
+        />
+      )}
+
+      <div className="bottom-nav">
+        <button className={`nav-btn ${view === 'home' ? 'active' : ''}`} onClick={() => setView('home')}>
+          <span className="nav-btn-icon">🏠</span>
+          <span className="nav-btn-label">בית</span>
+        </button>
+        <button className={`nav-btn ${view === 'stats' ? 'active' : ''}`} onClick={() => setView('stats')}>
+          <span className="nav-btn-icon">📊</span>
+          <span className="nav-btn-label">סטטיסטיקה</span>
+        </button>
+        <button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>
+          <span className="nav-btn-icon">📋</span>
+          <span className="nav-btn-label">היסטוריה</span>
+        </button>
+        <button className={`nav-btn ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}>
+          <span className="nav-btn-icon">⚙️</span>
+          <span className="nav-btn-label">הגדרות</span>
+        </button>
+      </div>
+
+      {modalType && (
+        <AddEventModal
+          type={modalType}
+          onSave={addEvent}
+          onClose={() => setModalType(null)}
+        />
+      )}
+
+      {toast && <div className="toast">{toast}</div>}
+    </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
