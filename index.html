@@ -1777,17 +1777,14 @@ const App = () => {
       showToast('לא ניתן להזמין את עצמך');
       return;
     }
-    // Check if user with this email already exists - if so, attach collaborator_id immediately
-    const { data: existing } = await supabase.from('profiles').select('id').eq('email', cleaned).maybeSingle();
-    const row = { owner_id: user.id, invited_email: cleaned };
-    if (existing) {
-      row.collaborator_id = existing.id;
-      row.status = 'accepted';
-      row.accepted_at = new Date().toISOString();
-    }
-    const { error } = await supabase.from('baby_collaborators').upsert(row, { onConflict: 'owner_id,invited_email' });
+    // Server-side trigger auto-accepts if a profile with this email already exists.
+    const { data, error } = await supabase
+      .from('baby_collaborators')
+      .upsert({ owner_id: user.id, invited_email: cleaned }, { onConflict: 'owner_id,invited_email' })
+      .select()
+      .single();
     if (error) { showToast('שגיאה: ' + error.message); return; }
-    showToast(existing ? 'שותפ/ה התווסף/ה!' : 'הזמנה נשלחה');
+    showToast(data?.status === 'accepted' ? 'שותפ/ה התווסף/ה!' : 'הזמנה נשלחה');
     refreshCollaborators();
   };
 
