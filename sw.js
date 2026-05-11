@@ -1,4 +1,4 @@
-const VERSION = 'baby-tracker-v1';
+const VERSION = 'baby-tracker-v2';
 const APP_SHELL = [
   './',
   './index.html',
