@@ -761,19 +761,18 @@
 const { useState, useEffect, useRef, useMemo } = React;
 
 // ============== SUPABASE SETUP ==============
-const SUPABASE_CONFIG_KEY = 'baby_tracker_supabase_config';
-const AUTH_KEY = 'baby_tracker_auth';
+const SUPABASE_URL = 'https://pkpvdunserlqbsfneqdm.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_8qcBqILtWbcjpYeEJrBQlg_Ud9u6uxA';
 const SETTINGS_KEY = 'baby_tracker_settings';
 
-let supabase = null;
-
-const initSupabase = (url, key) => {
-  if (url && key && window.supabase) {
-    supabase = window.supabase.createClient(url, key);
-    return true;
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'implicit'
   }
-  return false;
-};
+});
 
 // ============== UTILS ==============
 const formatTime = (seconds) => {
@@ -815,222 +814,49 @@ const EVENT_TYPES = {
   sleep: { label: 'שינה', icon: '😴', color: '#9575CD', bg: '#EDE7F6' }
 };
 
-// ============== SETUP SCREEN ==============
-const SetupScreen = ({ onSetup }) => {
-  const [url, setUrl] = useState('');
-  const [key, setKey] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSubmit = () => {
-    if (!url.trim() || !key.trim()) {
-      setError('יש למלא את שני השדות');
-      return;
-    }
-    if (!url.includes('supabase.co')) {
-      setError('כתובת Supabase לא תקינה');
-      return;
-    }
-    localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify({ url: url.trim(), key: key.trim() }));
-    onSetup({ url: url.trim(), key: key.trim() });
-  };
-
-  return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-emoji">🍼</div>
-        <h1 className="auth-title">חיבור ל-Supabase</h1>
-        <p className="auth-sub">חיבור ראשוני לבסיס הנתונים</p>
-
-        <div className="setup-help">
-          <strong>הוראות התקנה:</strong><br/>
-          1. הירשם ל-<code>supabase.com</code><br/>
-          2. צור פרויקט חדש<br/>
-          3. תחת Settings → API העתק:<br/>
-          &nbsp;&nbsp;• Project URL<br/>
-          &nbsp;&nbsp;• anon public key<br/>
-          4. הרץ את ה-SQL שמתחת בטאב SQL Editor
-        </div>
-
-        <input
-          className="setup-input"
-          placeholder="https://xxx.supabase.co"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-        <input
-          className="setup-input"
-          placeholder="anon public key (eyJ...)"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-        />
-
-        {error && <p style={{color: '#FF6B9D', fontSize: 13, marginBottom: 10}}>{error}</p>}
-
-        <button className="submit-btn" onClick={handleSubmit}>חיבור</button>
-
-        <details style={{marginTop: 16, textAlign: 'right'}}>
-          <summary style={{fontSize: 12, color: '#8B7B9A', cursor: 'pointer', fontWeight: 600}}>הצג SQL להתקנה</summary>
-          <pre style={{fontSize: 10, background: '#FFF5F8', padding: 12, borderRadius: 8, marginTop: 8, overflow: 'auto', direction: 'ltr', textAlign: 'left'}}>{`-- Users table
-CREATE TABLE users (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  username TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  baby_name TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Events table
-CREATE TABLE events (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  event_type TEXT NOT NULL,
-  started_at TIMESTAMPTZ NOT NULL,
-  ended_at TIMESTAMPTZ,
-  duration_seconds INT,
-  amount_ml INT,
-  side TEXT,
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_events_user_started 
-  ON events(user_id, started_at DESC);
-
--- Allow anon access (we handle auth in app)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "anon all users" ON users
-  FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon all events" ON events
-  FOR ALL USING (true) WITH CHECK (true);`}</pre>
-        </details>
-      </div>
-    </div>
-  );
-};
-
-// ============== AUTH ==============
-const hashPassword = async (password) => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + 'baby_tracker_salt_2026');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-};
-
-const AuthScreen = ({ onLogin }) => {
-  const [mode, setMode] = useState('login');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [babyName, setBabyName] = useState('');
-  const [error, setError] = useState('');
+// ============== AUTH SCREEN (Google OAuth) ==============
+const AuthScreen = () => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = async () => {
+  const handleGoogle = async () => {
     setError('');
-    if (!username.trim() || !password.trim()) {
-      setError('יש למלא את כל השדות');
-      return;
-    }
-    if (password.length < 4) {
-      setError('סיסמה חייבת להיות לפחות 4 תווים');
-      return;
-    }
-
     setLoading(true);
     try {
-      const passHash = await hashPassword(password);
-
-      if (mode === 'signup') {
-        const { data: existing } = await supabase
-          .from('users')
-          .select('id')
-          .eq('username', username.trim().toLowerCase())
-          .maybeSingle();
-
-        if (existing) {
-          setError('שם המשתמש כבר תפוס');
-          setLoading(false);
-          return;
-        }
-
-        const { data, error: signupError } = await supabase
-          .from('users')
-          .insert([{
-            username: username.trim().toLowerCase(),
-            password_hash: passHash,
-            baby_name: babyName.trim() || 'התינוקת'
-          }])
-          .select()
-          .single();
-
-        if (signupError) throw signupError;
-        localStorage.setItem(AUTH_KEY, JSON.stringify(data));
-        onLogin(data);
-      } else {
-        const { data, error: loginError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('username', username.trim().toLowerCase())
-          .eq('password_hash', passHash)
-          .maybeSingle();
-
-        if (loginError) throw loginError;
-        if (!data) {
-          setError('שם משתמש או סיסמה שגויים');
-          setLoading(false);
-          return;
-        }
-
-        localStorage.setItem(AUTH_KEY, JSON.stringify(data));
-        onLogin(data);
-      }
+      const redirectTo = window.location.origin + window.location.pathname;
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo }
+      });
+      if (oauthError) throw oauthError;
     } catch (err) {
-      setError('שגיאה: ' + (err.message || 'נסה שוב'));
+      setError('שגיאה בהתחברות: ' + (err.message || 'נסי שוב'));
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <div className="auth-emoji">{mode === 'signup' ? '🌸' : '💕'}</div>
-        <h1 className="auth-title">{mode === 'signup' ? 'הרשמה' : 'ברוכים השבים'}</h1>
-        <p className="auth-sub">{mode === 'signup' ? 'צרי חשבון חדש למעקב' : 'התחברי לחשבון שלך'}</p>
-
-        <input
-          className="setup-input"
-          placeholder="שם משתמש"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoComplete="username"
-        />
-        <input
-          className="setup-input"
-          type="password"
-          placeholder="סיסמה"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-        />
-        {mode === 'signup' && (
-          <input
-            className="setup-input"
-            placeholder="שם התינוקת (אופציונלי)"
-            value={babyName}
-            onChange={(e) => setBabyName(e.target.value)}
-            style={{direction: 'rtl', textAlign: 'right'}}
-          />
-        )}
+        <div className="auth-emoji">💕</div>
+        <h1 className="auth-title">מעקב התינוקת</h1>
+        <p className="auth-sub">התחברי כדי להתחיל</p>
 
         {error && <p style={{color: '#FF6B9D', fontSize: 13, marginBottom: 10}}>{error}</p>}
 
-        <button className="submit-btn" onClick={handleSubmit} disabled={loading}>
-          {loading ? 'טוען...' : (mode === 'signup' ? 'יצירת חשבון' : 'התחברות')}
-        </button>
-
-        <button className="auth-toggle" onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); }}>
-          {mode === 'login' ? 'אין לך חשבון? הרשמה' : 'יש לך חשבון? התחברות'}
+        <button
+          className="submit-btn"
+          onClick={handleGoogle}
+          disabled={loading}
+          style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10}}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" style={{background: 'white', borderRadius: '50%', padding: 2}}>
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          {loading ? 'מעבירה ל-Google...' : 'התחברות עם Google'}
         </button>
       </div>
     </div>
@@ -1352,27 +1178,31 @@ const StatsView = ({ events }) => {
 };
 
 // ============== SETTINGS VIEW ==============
-const SettingsView = ({ user, settings, onUpdateSettings, onLogout, onResetSupabase }) => {
+const SettingsView = ({ user, profile, settings, onUpdateSettings, onLogout, onEditBabyName }) => {
   const updateSetting = (key, value) => {
     const newSettings = { ...settings, [key]: value };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
     onUpdateSettings(newSettings);
   };
 
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || '';
+  const email = user?.email || '';
+
   return (
     <>
       <div className="card">
         <div className="card-title">👶 פרטי התינוקת</div>
-        <div className="setting-row">
+        <div className="setting-row" onClick={onEditBabyName} style={{cursor: 'pointer'}}>
           <div>
             <div className="setting-label">שם</div>
-            <div className="setting-desc">{user.baby_name || 'לא הוגדר'}</div>
+            <div className="setting-desc">{profile?.baby_name || 'הקישי לעריכה'}</div>
           </div>
+          <div style={{fontSize: 18, color: '#8B7B9A'}}>✎</div>
         </div>
         <div className="setting-row">
           <div>
-            <div className="setting-label">משתמש</div>
-            <div className="setting-desc">{user.username}</div>
+            <div className="setting-label">חשבון</div>
+            <div className="setting-desc">{displayName}{email && displayName !== email ? ` · ${email}` : ''}</div>
           </div>
         </div>
       </div>
@@ -1414,13 +1244,9 @@ const SettingsView = ({ user, settings, onUpdateSettings, onLogout, onResetSupab
       <div className="card">
         <div className="card-title">⚙️ חשבון</div>
         <button
-          style={{width: '100%', padding: '14px', background: '#FFE8F0', color: '#E91E63', border: 'none', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, marginBottom: 8, cursor: 'pointer'}}
+          style={{width: '100%', padding: '14px', background: '#FFE8F0', color: '#E91E63', border: 'none', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer'}}
           onClick={onLogout}
         >יציאה</button>
-        <button
-          style={{width: '100%', padding: '14px', background: '#F5F5F5', color: '#5C4E6B', border: 'none', borderRadius: 14, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer'}}
-          onClick={onResetSupabase}
-        >החלפת חיבור Supabase</button>
       </div>
     </>
   );
@@ -1428,8 +1254,8 @@ const SettingsView = ({ user, settings, onUpdateSettings, onLogout, onResetSupab
 
 // ============== MAIN APP ==============
 const App = () => {
-  const [supabaseConfig, setSupabaseConfig] = useState(null);
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('home');
   const [events, setEvents] = useState([]);
@@ -1442,23 +1268,39 @@ const App = () => {
     timerSound: true
   });
 
-  // Init
+  // Init: load local state + subscribe to auth changes
   useEffect(() => {
-    const savedConfig = localStorage.getItem(SUPABASE_CONFIG_KEY);
-    if (savedConfig) {
-      const config = JSON.parse(savedConfig);
-      if (initSupabase(config.url, config.key)) {
-        setSupabaseConfig(config);
-        const savedUser = localStorage.getItem(AUTH_KEY);
-        if (savedUser) setUser(JSON.parse(savedUser));
-        const savedSettings = localStorage.getItem(SETTINGS_KEY);
-        if (savedSettings) setSettings(JSON.parse(savedSettings));
-        const savedTimer = localStorage.getItem('baby_tracker_active_timer');
-        if (savedTimer) setActiveTimer(JSON.parse(savedTimer));
+    const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    if (savedSettings) setSettings(JSON.parse(savedSettings));
+    const savedTimer = localStorage.getItem('baby_tracker_active_timer');
+    if (savedTimer) setActiveTimer(JSON.parse(savedTimer));
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+      if (window.location.hash.includes('access_token') ||
+          window.location.search.includes('code=')) {
+        window.history.replaceState(null, '', window.location.pathname);
       }
-    }
-    setLoading(false);
+    }).catch(() => setLoading(false));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (event === 'SIGNED_OUT') {
+        setEvents([]);
+        setProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  // Load profile when user changes
+  useEffect(() => {
+    if (!user) { setProfile(null); return; }
+    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+      .then(({ data }) => setProfile(data));
+  }, [user]);
 
   // Load events
   useEffect(() => {
@@ -1582,21 +1424,28 @@ const App = () => {
     loadEvents();
   };
 
-  const logout = () => {
+  const logout = async () => {
     if (confirm('להתנתק?')) {
-      localStorage.removeItem(AUTH_KEY);
       localStorage.removeItem('baby_tracker_active_timer');
-      setUser(null);
-      setEvents([]);
       setActiveTimer(null);
+      await supabase.auth.signOut();
     }
   };
 
-  const resetSupabase = () => {
-    if (confirm('להחליף חיבור Supabase? תצטרך להתחבר מחדש')) {
-      localStorage.removeItem(SUPABASE_CONFIG_KEY);
-      localStorage.removeItem(AUTH_KEY);
-      window.location.reload();
+  const editBabyName = async () => {
+    const next = prompt('שם התינוקת:', profile?.baby_name || '');
+    if (next === null) return;
+    const trimmed = next.trim();
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert({ id: user.id, baby_name: trimmed || null }, { onConflict: 'id' })
+      .select()
+      .single();
+    if (error) {
+      showToast('שגיאה בשמירה');
+    } else {
+      setProfile(data);
+      showToast('נשמר');
     }
   };
 
@@ -1613,12 +1462,8 @@ const App = () => {
     return <div className="loading">טוען... 💕</div>;
   }
 
-  if (!supabaseConfig) {
-    return <SetupScreen onSetup={(config) => setSupabaseConfig(config)} />;
-  }
-
   if (!user) {
-    return <AuthScreen onLogin={(u) => setUser(u)} />;
+    return <AuthScreen />;
   }
 
   // ============== RENDER VIEWS ==============
@@ -1736,7 +1581,7 @@ const App = () => {
   return (
     <>
       <div className="header">
-        <h1>{user.baby_name || 'התינוקת שלי'} 💕</h1>
+        <h1>{profile?.baby_name || 'התינוקת שלי'} 💕</h1>
         <div className="date">{formatHebrewDate(new Date())}</div>
       </div>
 
@@ -1746,10 +1591,11 @@ const App = () => {
       {view === 'settings' && (
         <SettingsView
           user={user}
+          profile={profile}
           settings={settings}
           onUpdateSettings={setSettings}
           onLogout={logout}
-          onResetSupabase={resetSupabase}
+          onEditBabyName={editBabyName}
         />
       )}
 
