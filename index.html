@@ -2,9 +2,16 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#FFB6C9">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FF8FB1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="תינוקת">
 <title>מעקב התינוקת שלי 💕</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
@@ -811,7 +818,8 @@ const EVENT_TYPES = {
   pumping: { label: 'שאיבה', icon: '💧', color: '#64B5F6', bg: '#DCEEFF' },
   pee: { label: 'פיפי', icon: '💛', color: '#FFA726', bg: '#FFF3E0' },
   poo: { label: 'קקי', icon: '💩', color: '#8D6E63', bg: '#EFEBE9' },
-  sleep: { label: 'שינה', icon: '😴', color: '#9575CD', bg: '#EDE7F6' }
+  sleep: { label: 'שינה', icon: '😴', color: '#9575CD', bg: '#EDE7F6' },
+  vitamin_d: { label: 'ויטמין D', icon: '💊', color: '#F4A742', bg: '#FFF8E1' }
 };
 
 // ============== AUTH SCREEN (Google OAuth) ==============
@@ -1178,7 +1186,15 @@ const StatsView = ({ events }) => {
 };
 
 // ============== SETTINGS VIEW ==============
-const SettingsView = ({ user, profile, settings, onUpdateSettings, onLogout, onEditBabyName }) => {
+const SettingsView = ({
+  user, profile, isOwner, accessibleBabies, activeOwnerId, onSwitchBaby,
+  collaborators, onInvite, onRemoveCollaborator,
+  settings, onUpdateSettings, onLogout, onEditBabyName,
+  installPrompt, onInstall
+}) => {
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+
   const updateSetting = (key, value) => {
     const newSettings = { ...settings, [key]: value };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
@@ -1187,17 +1203,27 @@ const SettingsView = ({ user, profile, settings, onUpdateSettings, onLogout, onE
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || '';
   const email = user?.email || '';
+  const sharedBabies = (accessibleBabies || []).filter((b) => !b.is_owner);
+  const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+
+  const submitInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    await onInvite(inviteEmail);
+    setInviteEmail('');
+    setInviting(false);
+  };
 
   return (
     <>
       <div className="card">
         <div className="card-title">👶 פרטי התינוקת</div>
-        <div className="setting-row" onClick={onEditBabyName} style={{cursor: 'pointer'}}>
+        <div className="setting-row" onClick={isOwner ? onEditBabyName : undefined} style={{cursor: isOwner ? 'pointer' : 'default'}}>
           <div>
             <div className="setting-label">שם</div>
-            <div className="setting-desc">{profile?.baby_name || 'הקישי לעריכה'}</div>
+            <div className="setting-desc">{profile?.baby_name || (isOwner ? 'הקישי לעריכה' : '—')}</div>
           </div>
-          <div style={{fontSize: 18, color: '#8B7B9A'}}>✎</div>
+          {isOwner && <div style={{fontSize: 18, color: '#8B7B9A'}}>✎</div>}
         </div>
         <div className="setting-row">
           <div>
@@ -1205,7 +1231,66 @@ const SettingsView = ({ user, profile, settings, onUpdateSettings, onLogout, onE
             <div className="setting-desc">{displayName}{email && displayName !== email ? ` · ${email}` : ''}</div>
           </div>
         </div>
+        {sharedBabies.length > 0 && (
+          <div className="setting-row" style={{display: 'block'}}>
+            <div className="setting-label" style={{marginBottom: 8}}>תינוקת פעילה</div>
+            <select
+              value={activeOwnerId || ''}
+              onChange={(e) => onSwitchBaby(e.target.value)}
+              style={{width: '100%', padding: '12px', borderRadius: 12, border: '1px solid #D4CBDE', fontSize: 14, fontFamily: 'inherit', background: 'white'}}
+            >
+              {(accessibleBabies || []).map((b) => (
+                <option key={b.owner_id} value={b.owner_id}>
+                  {b.is_owner ? 'שלי' : (b.profile?.baby_name || b.profile?.full_name || b.profile?.email || 'תינוקת משותפת')}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
+
+      {isOwner && (
+        <div className="card">
+          <div className="card-title">👥 שיתוף</div>
+          <div className="setting-row" style={{display: 'block', borderBottom: 'none'}}>
+            <div className="setting-desc" style={{marginBottom: 10}}>
+              הזמיני בני משפחה לעקוב יחד אחרי התינוקת. הם יוכלו להוסיף, לערוך ולמחוק רישומים.
+            </div>
+            <div style={{display: 'flex', gap: 8}}>
+              <input
+                type="email"
+                placeholder="email@example.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitInvite()}
+                style={{flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #D4CBDE', fontSize: 14, fontFamily: 'inherit', direction: 'ltr', textAlign: 'left'}}
+                autoComplete="email"
+                inputMode="email"
+              />
+              <button
+                onClick={submitInvite}
+                disabled={inviting || !inviteEmail.trim()}
+                style={{padding: '12px 18px', background: '#FF8FB1', color: 'white', border: 'none', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer'}}
+              >{inviting ? '...' : 'הזמיני'}</button>
+            </div>
+          </div>
+          {collaborators && collaborators.length > 0 && collaborators.map((c) => (
+            <div className="setting-row" key={c.id}>
+              <div>
+                <div className="setting-label" style={{direction: 'ltr', textAlign: 'right', fontSize: 13}}>{c.invited_email}</div>
+                <div className="setting-desc" style={{color: c.status === 'accepted' ? '#42A5F5' : '#8B7B9A'}}>
+                  {c.status === 'accepted' ? '✓ פעיל/ה' : 'ממתינ/ה להתחברות ראשונה'}
+                </div>
+              </div>
+              <button
+                onClick={() => onRemoveCollaborator(c.id)}
+                style={{background: 'transparent', border: 'none', color: '#E91E63', fontSize: 20, cursor: 'pointer', padding: 4}}
+                aria-label="הסר"
+              >×</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="card">
         <div className="card-title">🔔 תזכורות</div>
@@ -1241,6 +1326,25 @@ const SettingsView = ({ user, profile, settings, onUpdateSettings, onLogout, onE
         </div>
       </div>
 
+      {!isStandalone && (installPrompt || /iPhone|iPad|iPod/.test(navigator.userAgent)) && (
+        <div className="card">
+          <div className="card-title">📱 התקנה</div>
+          {installPrompt && (
+            <button
+              onClick={onInstall}
+              style={{width: '100%', padding: '14px', background: 'linear-gradient(135deg,#FF8FB1,#64B5F6)', color: 'white', border: 'none', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer'}}
+            >התקיני את האפליקציה</button>
+          )}
+          {!installPrompt && /iPhone|iPad|iPod/.test(navigator.userAgent) && (
+            <div className="setting-desc" style={{lineHeight: 1.7}}>
+              להוספה למסך הבית:<br/>
+              1. הקישי על כפתור השיתוף בתחתית Safari<br/>
+              2. בחרי <strong>הוסף למסך הבית</strong>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="card">
         <div className="card-title">⚙️ חשבון</div>
         <button
@@ -1253,9 +1357,15 @@ const SettingsView = ({ user, profile, settings, onUpdateSettings, onLogout, onE
 };
 
 // ============== MAIN APP ==============
+const ACTIVE_OWNER_KEY = 'baby_tracker_active_owner';
+
 const App = () => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [activeOwnerId, setActiveOwnerId] = useState(null);
+  const [accessibleBabies, setAccessibleBabies] = useState([]);
+  const [collaborators, setCollaborators] = useState([]);
+  const [installPrompt, setInstallPrompt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('home');
   const [events, setEvents] = useState([]);
@@ -1267,6 +1377,8 @@ const App = () => {
     pumpReminder: false,
     timerSound: true
   });
+
+  const isOwner = user && activeOwnerId === user.id;
 
   // Init: load local state + subscribe to auth changes
   useEffect(() => {
@@ -1289,33 +1401,105 @@ const App = () => {
       if (event === 'SIGNED_OUT') {
         setEvents([]);
         setProfile(null);
+        setActiveOwnerId(null);
+        setAccessibleBabies([]);
+        setCollaborators([]);
       }
     });
 
-    return () => subscription.unsubscribe();
+    const handleInstallPrompt = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+    };
   }, []);
 
-  // Load profile when user changes
+  // Discover accessible babies (self + accepted shares) when user changes
   useEffect(() => {
-    if (!user) { setProfile(null); return; }
-    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-      .then(({ data }) => setProfile(data));
+    if (!user) { setAccessibleBabies([]); setActiveOwnerId(null); return; }
+    (async () => {
+      // 1. Always self
+      const babies = [{ owner_id: user.id, is_owner: true }];
+      // 2. Accepted collaborations
+      const { data: shares } = await supabase
+        .from('baby_collaborators')
+        .select('owner_id')
+        .eq('collaborator_id', user.id)
+        .eq('status', 'accepted');
+      const ownerIds = new Set();
+      (shares || []).forEach((r) => ownerIds.add(r.owner_id));
+      // 3. Resolve owner profiles
+      let profiles = [];
+      const allIds = Array.from(new Set([user.id, ...ownerIds]));
+      if (allIds.length) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, baby_name, full_name, email, avatar_url')
+          .in('id', allIds);
+        profiles = data || [];
+      }
+      const byId = new Map(profiles.map((p) => [p.id, p]));
+      const list = [];
+      list.push({ owner_id: user.id, is_owner: true, profile: byId.get(user.id) });
+      ownerIds.forEach((id) => list.push({ owner_id: id, is_owner: false, profile: byId.get(id) }));
+      setAccessibleBabies(list);
+
+      const saved = localStorage.getItem(ACTIVE_OWNER_KEY);
+      const valid = saved && list.some((b) => b.owner_id === saved);
+      setActiveOwnerId(valid ? saved : user.id);
+    })();
   }, [user]);
 
-  // Load events
+  // Persist active owner choice
   useEffect(() => {
-    if (user) loadEvents();
-  }, [user]);
+    if (activeOwnerId) localStorage.setItem(ACTIVE_OWNER_KEY, activeOwnerId);
+  }, [activeOwnerId]);
+
+  // Load profile of the active baby owner
+  useEffect(() => {
+    if (!activeOwnerId) { setProfile(null); return; }
+    supabase.from('profiles').select('*').eq('id', activeOwnerId).maybeSingle()
+      .then(({ data }) => setProfile(data));
+  }, [activeOwnerId]);
+
+  // Load collaborators when the user is viewing their own baby
+  useEffect(() => {
+    if (!user || !isOwner) { setCollaborators([]); return; }
+    supabase.from('baby_collaborators')
+      .select('id, invited_email, status, created_at, accepted_at, collaborator_id')
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setCollaborators(data || []));
+  }, [user, isOwner, activeOwnerId]);
+
+  // Load events for the active baby
+  useEffect(() => {
+    if (activeOwnerId) loadEvents();
+  }, [activeOwnerId]);
 
   const loadEvents = async () => {
-    if (!user) return;
+    if (!activeOwnerId) return;
     const { data, error } = await supabase
       .from('events')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', activeOwnerId)
       .order('started_at', { ascending: false })
       .limit(200);
     if (!error) setEvents(data || []);
+  };
+
+  const refreshCollaborators = async () => {
+    if (!user) return;
+    const { data } = await supabase.from('baby_collaborators')
+      .select('id, invited_email, status, created_at, accepted_at, collaborator_id')
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: false });
+    setCollaborators(data || []);
   };
 
   const showToast = (msg) => {
@@ -1348,7 +1532,7 @@ const App = () => {
       // For pumping, prompt for amount
       const amount = prompt('כמה מ״ל נשאבו?');
       const event = {
-        user_id: user.id,
+        user_id: activeOwnerId,
         event_type: activeTimer.type,
         started_at: activeTimer.startedAt,
         ended_at: endedAt.toISOString(),
@@ -1359,7 +1543,7 @@ const App = () => {
       await supabase.from('events').insert([event]);
     } else {
       const event = {
-        user_id: user.id,
+        user_id: activeOwnerId,
         event_type: activeTimer.type,
         started_at: activeTimer.startedAt,
         ended_at: endedAt.toISOString(),
@@ -1401,7 +1585,7 @@ const App = () => {
 
   const quickAdd = async (type) => {
     const event = {
-      user_id: user.id,
+      user_id: activeOwnerId,
       event_type: type,
       started_at: new Date().toISOString()
     };
@@ -1411,7 +1595,7 @@ const App = () => {
   };
 
   const addEvent = async (event) => {
-    await supabase.from('events').insert([{ ...event, user_id: user.id }]);
+    await supabase.from('events').insert([{ ...event, user_id: activeOwnerId }]);
     setModalType(null);
     showToast('נשמר בהצלחה');
     loadEvents();
@@ -1433,6 +1617,7 @@ const App = () => {
   };
 
   const editBabyName = async () => {
+    if (!isOwner) { showToast('רק הבעלים יכול לשנות'); return; }
     const next = prompt('שם התינוקת:', profile?.baby_name || '');
     if (next === null) return;
     const trimmed = next.trim();
@@ -1447,6 +1632,46 @@ const App = () => {
       setProfile(data);
       showToast('נשמר');
     }
+  };
+
+  const inviteCollaborator = async (email) => {
+    if (!user) return;
+    const cleaned = (email || '').trim().toLowerCase();
+    if (!cleaned || !cleaned.includes('@')) {
+      showToast('מייל לא תקין');
+      return;
+    }
+    if (cleaned === (user.email || '').toLowerCase()) {
+      showToast('לא ניתן להזמין את עצמך');
+      return;
+    }
+    // Check if user with this email already exists - if so, attach collaborator_id immediately
+    const { data: existing } = await supabase.from('profiles').select('id').eq('email', cleaned).maybeSingle();
+    const row = { owner_id: user.id, invited_email: cleaned };
+    if (existing) {
+      row.collaborator_id = existing.id;
+      row.status = 'accepted';
+      row.accepted_at = new Date().toISOString();
+    }
+    const { error } = await supabase.from('baby_collaborators').upsert(row, { onConflict: 'owner_id,invited_email' });
+    if (error) { showToast('שגיאה: ' + error.message); return; }
+    showToast(existing ? 'שותפ/ה התווסף/ה!' : 'הזמנה נשלחה');
+    refreshCollaborators();
+  };
+
+  const removeCollaborator = async (id) => {
+    if (!confirm('להסיר את השותף?')) return;
+    const { error } = await supabase.from('baby_collaborators').delete().eq('id', id);
+    if (error) { showToast('שגיאה'); return; }
+    showToast('הוסר');
+    refreshCollaborators();
+  };
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => {});
+    setInstallPrompt(null);
   };
 
   // Calculate last events for "time since"
@@ -1502,6 +1727,11 @@ const App = () => {
           <span className="quick-btn-icon">💩</span>
           <div className="quick-btn-title">קקי</div>
           <div className="quick-btn-sub">{lastByType.poo ? timeSince(lastByType.poo.started_at) : 'הוספה מהירה'}</div>
+        </button>
+        <button className="quick-btn cream" onClick={() => quickAdd('vitamin_d')}>
+          <span className="quick-btn-icon">💊</span>
+          <div className="quick-btn-title">ויטמין D</div>
+          <div className="quick-btn-sub">{lastByType.vitamin_d ? timeSince(lastByType.vitamin_d.started_at) : 'הוספה מהירה'}</div>
         </button>
         <button className="quick-btn mix" onClick={() => setModalType('sleep')}>
           <span className="quick-btn-icon">😴</span>
@@ -1582,7 +1812,10 @@ const App = () => {
     <>
       <div className="header">
         <h1>{profile?.baby_name || 'התינוקת שלי'} 💕</h1>
-        <div className="date">{formatHebrewDate(new Date())}</div>
+        <div className="date">
+          {formatHebrewDate(new Date())}
+          {!isOwner && profile && <span style={{marginInlineStart: 8, padding: '2px 8px', background: 'rgba(255,255,255,0.5)', borderRadius: 10, fontSize: 11}}>שיתוף מ-{profile.full_name || profile.email}</span>}
+        </div>
       </div>
 
       {view === 'home' && renderHome()}
@@ -1592,10 +1825,19 @@ const App = () => {
         <SettingsView
           user={user}
           profile={profile}
+          isOwner={isOwner}
+          accessibleBabies={accessibleBabies}
+          activeOwnerId={activeOwnerId}
+          onSwitchBaby={setActiveOwnerId}
+          collaborators={collaborators}
+          onInvite={inviteCollaborator}
+          onRemoveCollaborator={removeCollaborator}
           settings={settings}
           onUpdateSettings={setSettings}
           onLogout={logout}
           onEditBabyName={editBabyName}
+          installPrompt={installPrompt}
+          onInstall={handleInstall}
         />
       )}
 
@@ -1632,6 +1874,12 @@ const App = () => {
 };
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW registration failed', err));
+  });
+}
 </script>
 </body>
 </html>
