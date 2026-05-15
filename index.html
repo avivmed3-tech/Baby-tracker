@@ -597,6 +597,67 @@
 
   .submit-btn:active { transform: scale(0.98); }
 
+  /* Date filter chips */
+  .date-filter {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .date-filter::-webkit-scrollbar { display: none; }
+
+  .date-chip {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    background: var(--white);
+    border: none;
+    border-radius: 100px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all 0.25s;
+    box-shadow: var(--shadow-soft);
+    white-space: nowrap;
+  }
+  .date-chip.active {
+    background: var(--gradient-pink);
+    color: white;
+    box-shadow: var(--shadow-pink);
+    transform: translateY(-1px);
+  }
+
+  /* Mama vitamins */
+  .vitamin-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--pink-50);
+  }
+  .vitamin-row:last-child { border-bottom: none; }
+
+  .vitamin-took-btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .vitamin-took-btn.done { background: #E8F5E9; color: #2E7D32; cursor: default; }
+  .vitamin-took-btn.todo { background: var(--gradient-pink); color: white; }
+  .vitamin-took-btn.todo:active { transform: scale(0.96); }
+
+  /* Bottom nav 5-item adjustment */
+  .bottom-nav { padding: 8px 8px 22px; }
+  .nav-btn { padding: 8px 6px; }
+
   /* Empty State */
   .empty {
     text-align: center;
@@ -829,7 +890,24 @@ const EVENT_TYPES = {
   pee: { label: 'פיפי', icon: '💛', color: '#FFA726', bg: '#FFF3E0' },
   poo: { label: 'קקי', icon: '💩', color: '#8D6E63', bg: '#EFEBE9' },
   sleep: { label: 'שינה', icon: '😴', color: '#9575CD', bg: '#EDE7F6' },
-  vitamin_d: { label: 'ויטמין D', icon: '💊', color: '#F4A742', bg: '#FFF8E1' }
+  vitamin_d: { label: 'ויטמין D', icon: '💊', color: '#F4A742', bg: '#FFF8E1' },
+  mama_vitamin: { label: 'ויטמין אמא', icon: '💜', color: '#9C27B0', bg: '#F3E5F5' }
+};
+
+const playReminderSound = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const beep = (freq, t, dur) => {
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.start(t); o.stop(t + dur);
+    };
+    const t = ctx.currentTime;
+    beep(660, t, 0.18); beep(880, t + 0.22, 0.18); beep(1047, t + 0.44, 0.28);
+  } catch(e) {}
 };
 
 // ============== AUTH SCREEN (Google OAuth) ==============
@@ -1155,151 +1233,307 @@ const EditEventModal = ({ event, onSave, onClose }) => {
   );
 };
 
+// ============== MAMA VITAMINS VIEW ==============
+const DEFAULT_MAMA_VITAMINS = [
+  { id: 'v_d', name: 'ויטמין D', reminderOn: false, time: '08:00' },
+  { id: 'v_iron', name: 'ברזל', reminderOn: false, time: '08:00' },
+  { id: 'v_omega', name: 'אומגה 3', reminderOn: false, time: '08:00' },
+  { id: 'v_multi', name: 'מולטי ויטמין', reminderOn: false, time: '08:00' },
+];
+
+const MamaVitaminsView = ({ events, onLogVitamin, settings, onUpdateSettings }) => {
+  const [newName, setNewName] = useState('');
+  const vitamins = settings.mamaVitamins || DEFAULT_MAMA_VITAMINS;
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayStr = today.toDateString();
+  const mamaEvents = events.filter(e => e.event_type === 'mama_vitamin');
+  const todayEvents = mamaEvents.filter(e => new Date(e.started_at).toDateString() === todayStr);
+
+  const tookToday = (name) => todayEvents.some(e => e.notes === name);
+  const lastTook = (name) => { const f = mamaEvents.find(e => e.notes === name); return f ? f.started_at : null; };
+
+  const updateVitamins = (newList) => {
+    const s = { ...settings, mamaVitamins: newList };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    onUpdateSettings(s);
+  };
+
+  const addVitamin = () => {
+    const name = newName.trim();
+    if (!name) return;
+    updateVitamins([...vitamins, { id: `v_${Date.now()}`, name, reminderOn: false, time: '08:00' }]);
+    setNewName('');
+  };
+
+  const toggleReminder = (id) => updateVitamins(vitamins.map(v => v.id === id ? { ...v, reminderOn: !v.reminderOn } : v));
+  const updateTime = (id, time) => updateVitamins(vitamins.map(v => v.id === id ? { ...v, time } : v));
+  const removeVitamin = (id) => { if (confirm('להסיר ויטמין?')) updateVitamins(vitamins.filter(v => v.id !== id)); };
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-title">💜 ויטמינים שלי - היום</div>
+        {vitamins.map(v => {
+          const took = tookToday(v.name);
+          const last = lastTook(v.name);
+          return (
+            <div key={v.id} className="vitamin-row">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gray-900)' }}>{v.name}</div>
+                <div style={{ fontSize: 12, color: took ? '#2E7D32' : 'var(--gray-500)', marginTop: 2 }}>
+                  {took ? '✓ לקחתי היום' : last ? `אחרון: ${timeSince(last)}` : 'לא נרשם עדיין'}
+                </div>
+              </div>
+              {v.reminderOn && <span style={{ fontSize: 11, color: 'var(--pink-500)', fontWeight: 600 }}>🔔 {v.time}</span>}
+              <button
+                className={`vitamin-took-btn ${took ? 'done' : 'todo'}`}
+                onClick={() => !took && onLogVitamin(v.name)}
+              >{took ? '✓ נלקח' : 'לקחתי'}</button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="card">
+        <div className="card-title">⚙️ ניהול ויטמינים</div>
+        {vitamins.map(v => (
+          <div key={v.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--pink-50)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{v.name}</div>
+              <span style={{ fontSize: 12, color: 'var(--gray-500)' }}>תזכורת</span>
+              <div className={`switch ${v.reminderOn ? 'on' : ''}`} onClick={() => toggleReminder(v.id)}></div>
+              <button onClick={() => removeVitamin(v.id)}
+                style={{ background: 'none', border: 'none', color: 'var(--gray-300)', fontSize: 20, cursor: 'pointer', padding: '0 4px' }}>×</button>
+            </div>
+            {v.reminderOn && (
+              <input type="time" value={v.time}
+                onChange={(e) => updateTime(v.id, e.target.value)}
+                style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--pink-100)', fontFamily: 'inherit', fontSize: 14, width: '100%' }} />
+            )}
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <input type="text" placeholder="שם הויטמין..." value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addVitamin()}
+            style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid var(--pink-100)', fontFamily: 'inherit', fontSize: 14 }} />
+          <button onClick={addVitamin}
+            style={{ padding: '12px 18px', background: '#FF8FB1', color: 'white', border: 'none', borderRadius: 12, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            + הוסיפי</button>
+        </div>
+      </div>
+
+      {mamaEvents.length > 0 && (
+        <div className="card">
+          <div className="card-title">📋 היסטוריה</div>
+          {mamaEvents.slice(0, 15).map(e => (
+            <div key={e.id} className="history-item">
+              <div className="history-icon" style={{ background: '#F3E5F5', color: '#9C27B0' }}>💜</div>
+              <div className="history-content">
+                <div className="history-title">{e.notes}</div>
+                <div className="history-meta">{formatClock(e.started_at)}</div>
+              </div>
+              <div className="history-time">{timeSince(e.started_at)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+};
+
 // ============== STATS VIEW ==============
 const StatsView = ({ events }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+  // null = weekly view, Date object = specific day view
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  // Build list of last 7 days for the filter
+  const filterDays = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i); return d;
+  }), []);
+
+  const dayLabel = (d, i) => i === 0 ? 'היום' : i === 1 ? 'אתמול' : `${d.getDate()}/${d.getMonth() + 1}`;
+
+  const getDayStats = (day) => {
+    const next = new Date(day); next.setDate(next.getDate() + 1);
+    const evts = events.filter(e => { const t = new Date(e.started_at); return t >= day && t < next; });
+    return {
+      feeds: evts.filter(e => ['nursing', 'bottle'].includes(e.event_type)).length,
+      nursing: evts.filter(e => e.event_type === 'nursing').length,
+      bottle: evts.filter(e => e.event_type === 'bottle').length,
+      pumping: evts.filter(e => e.event_type === 'pumping').length,
+      pumpingMl: evts.filter(e => e.event_type === 'pumping').reduce((s, e) => s + (e.amount_ml || 0), 0),
+      pee: evts.filter(e => e.event_type === 'pee').length,
+      poo: evts.filter(e => e.event_type === 'poo').length,
+      sleep: evts.filter(e => e.event_type === 'sleep').length,
+      vitaminD: evts.filter(e => e.event_type === 'vitamin_d').length,
+      evts,
+    };
+  };
 
   const stats = useMemo(() => {
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - (6 - i));
-      return d;
-    });
+    const last7Days = filterDays.slice().reverse();
+    const dailyData = last7Days.map(day => ({ date: day, ...getDayStats(day) }));
+    return { dailyData };
+  }, [events, filterDays]);
 
-    const dailyData = last7Days.map(day => {
-      const nextDay = new Date(day);
-      nextDay.setDate(nextDay.getDate() + 1);
-      const dayEvents = events.filter(e => {
-        const t = new Date(e.started_at);
-        return t >= day && t < nextDay;
-      });
-
-      return {
-        date: day,
-        feeds: dayEvents.filter(e => ['nursing', 'bottle'].includes(e.event_type)).length,
-        pumping: dayEvents.filter(e => e.event_type === 'pumping').length,
-        pumpingMl: dayEvents.filter(e => e.event_type === 'pumping').reduce((s, e) => s + (e.amount_ml || 0), 0),
-        pee: dayEvents.filter(e => e.event_type === 'pee').length,
-        poo: dayEvents.filter(e => e.event_type === 'poo').length,
-      };
-    });
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayEvents = events.filter(e => new Date(e.started_at) >= today);
-
-    return {
-      dailyData,
-      today: {
-        feeds: todayEvents.filter(e => ['nursing', 'bottle'].includes(e.event_type)).length,
-        pumping: todayEvents.filter(e => e.event_type === 'pumping').length,
-        pumpingMl: todayEvents.filter(e => e.event_type === 'pumping').reduce((s, e) => s + (e.amount_ml || 0), 0),
-        pee: todayEvents.filter(e => e.event_type === 'pee').length,
-        poo: todayEvents.filter(e => e.event_type === 'poo').length,
-      }
-    };
-  }, [events]);
+  const selectedStats = useMemo(() => selectedDay ? getDayStats(selectedDay) : getDayStats(filterDays[0]), [selectedDay, events, filterDays]);
 
   useEffect(() => {
-    if (!chartRef.current || !window.Chart) return;
-
+    if (!chartRef.current || !window.Chart || selectedDay) return;
     if (chartInstance.current) chartInstance.current.destroy();
-
     const ctx = chartRef.current.getContext('2d');
-    const labels = stats.dailyData.map(d => ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'][d.date.getDay()]);
-
+    const labels = stats.dailyData.map(d => ['א','ב','ג','ד','ה','ו','ש'][d.date.getDay()]);
     chartInstance.current = new window.Chart(ctx, {
       type: 'bar',
       data: {
         labels,
         datasets: [
-          {
-            label: 'האכלות',
-            data: stats.dailyData.map(d => d.feeds),
-            backgroundColor: '#FF8FB1',
-            borderRadius: 8,
-          },
-          {
-            label: 'שאיבות',
-            data: stats.dailyData.map(d => d.pumping),
-            backgroundColor: '#64B5F6',
-            borderRadius: 8,
-          }
+          { label: 'האכלות', data: stats.dailyData.map(d => d.feeds), backgroundColor: '#FF8FB1', borderRadius: 8 },
+          { label: 'שאיבות', data: stats.dailyData.map(d => d.pumping), backgroundColor: '#64B5F6', borderRadius: 8 }
         ]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { font: { family: 'Heebo', size: 12 }, usePointStyle: true, padding: 12 }
-          }
-        },
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Heebo', size: 12 }, usePointStyle: true, padding: 12 } } },
         scales: {
           x: { grid: { display: false }, ticks: { font: { family: 'Heebo', size: 11 } } },
           y: { beginAtZero: true, grid: { color: '#FFE8F0' }, ticks: { font: { family: 'Heebo', size: 11 }, precision: 0 } }
         }
       }
     });
-
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-  }, [stats]);
+  }, [stats, selectedDay]);
+
+  // Destroy chart when switching to day view
+  useEffect(() => {
+    if (selectedDay && chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
+  }, [selectedDay]);
+
+  const displayLabel = selectedDay
+    ? (() => { const idx = filterDays.findIndex(d => d.getTime() === selectedDay.getTime()); return idx === 0 ? 'היום' : idx === 1 ? 'אתמול' : formatHebrewDate(selectedDay); })()
+    : 'היום';
 
   return (
     <>
+      {/* Day filter */}
+      <div className="date-filter">
+        <button className={`date-chip ${!selectedDay ? 'active' : ''}`} onClick={() => setSelectedDay(null)}>
+          7 ימים
+        </button>
+        {filterDays.map((d, i) => (
+          <button
+            key={d.toISOString()}
+            className={`date-chip ${selectedDay && selectedDay.getTime() === d.getTime() ? 'active' : ''}`}
+            onClick={() => setSelectedDay(d)}
+          >{dayLabel(d, i)}</button>
+        ))}
+      </div>
+
+      {/* Day stats */}
       <div className="card">
-        <div className="card-title">📊 היום</div>
+        <div className="card-title">📊 {displayLabel}</div>
         <div className="stats-grid">
           <div className="stat-box">
-            <div className="stat-value">{stats.today.feeds}</div>
+            <div className="stat-value">{selectedStats.feeds}</div>
             <div className="stat-label">האכלות</div>
           </div>
           <div className="stat-box blue">
-            <div className="stat-value">{stats.today.pumping}</div>
+            <div className="stat-value">{selectedStats.pumping}</div>
             <div className="stat-label">שאיבות</div>
           </div>
           <div className="stat-box blue">
-            <div className="stat-value">{stats.today.pumpingMl}</div>
+            <div className="stat-value">{selectedStats.pumpingMl}</div>
             <div className="stat-label">מ״ל נשאבו</div>
           </div>
           <div className="stat-box">
-            <div className="stat-value">{stats.today.pee + stats.today.poo}</div>
+            <div className="stat-value">{selectedStats.pee + selectedStats.poo}</div>
             <div className="stat-label">החתלות</div>
           </div>
         </div>
+        {selectedDay && (
+          <div className="stats-grid" style={{ marginTop: 10 }}>
+            <div className="stat-box">
+              <div className="stat-value">{selectedStats.nursing}</div>
+              <div className="stat-label">הנקות</div>
+            </div>
+            <div className="stat-box">
+              <div className="stat-value">{selectedStats.bottle}</div>
+              <div className="stat-label">בקבוקים</div>
+            </div>
+            <div className="stat-box">
+              <div className="stat-value">{selectedStats.sleep}</div>
+              <div className="stat-label">שינות</div>
+            </div>
+            <div className="stat-box">
+              <div className="stat-value">{selectedStats.vitaminD}</div>
+              <div className="stat-label">ויטמין D</div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="card">
-        <div className="card-title">📈 7 ימים אחרונים</div>
-        <div className="chart-wrap">
-          <canvas ref={chartRef}></canvas>
+      {/* Weekly chart - shown only in weekly view */}
+      {!selectedDay && (
+        <div className="card">
+          <div className="card-title">📈 7 ימים אחרונים</div>
+          <div className="chart-wrap">
+            <canvas ref={chartRef}></canvas>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="card">
-        <div className="card-title">💡 ממוצעים שבועיים</div>
-        <div className="stats-grid">
-          <div className="stat-box">
-            <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.feeds, 0) / 7)}</div>
-            <div className="stat-label">האכלות ביום</div>
-          </div>
-          <div className="stat-box blue">
-            <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.pumpingMl, 0) / 7)}</div>
-            <div className="stat-label">מ״ל ביום</div>
-          </div>
-          <div className="stat-box">
-            <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.pee, 0) / 7)}</div>
-            <div className="stat-label">פיפי ביום</div>
-          </div>
-          <div className="stat-box">
-            <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.poo, 0) / 7)}</div>
-            <div className="stat-label">קקי ביום</div>
+      {/* Daily breakdown - shown in day view */}
+      {selectedDay && selectedStats.evts.length > 0 && (
+        <div className="card">
+          <div className="card-title">📋 פירוט {displayLabel}</div>
+          {selectedStats.evts.map(e => {
+            const cfg = EVENT_TYPES[e.event_type] || { label: e.event_type, icon: '•', color: '#888', bg: '#eee' };
+            return (
+              <div key={e.id} className="history-item">
+                <div className="history-icon" style={{ background: cfg.bg, color: cfg.color }}>{cfg.icon}</div>
+                <div className="history-content">
+                  <div className="history-title">{cfg.label}{e.amount_ml ? ` · ${e.amount_ml} מ״ל` : ''}{e.side ? ` · ${e.side === 'right' ? 'ימני' : e.side === 'left' ? 'שמאלי' : 'שניהם'}` : ''}</div>
+                  <div className="history-meta">{formatClock(e.started_at)}{e.duration_seconds ? ` · ${Math.floor(e.duration_seconds / 60)} ד׳` : ''}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {selectedDay && selectedStats.evts.length === 0 && (
+        <div className="card">
+          <div className="empty"><div className="empty-emoji">📅</div><div className="empty-text">אין רישומים ביום זה</div></div>
+        </div>
+      )}
+
+      {/* Weekly averages - always shown */}
+      {!selectedDay && (
+        <div className="card">
+          <div className="card-title">💡 ממוצעים שבועיים</div>
+          <div className="stats-grid">
+            <div className="stat-box">
+              <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.feeds, 0) / 7)}</div>
+              <div className="stat-label">האכלות ביום</div>
+            </div>
+            <div className="stat-box blue">
+              <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.pumpingMl, 0) / 7)}</div>
+              <div className="stat-label">מ״ל ביום</div>
+            </div>
+            <div className="stat-box">
+              <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.pee, 0) / 7)}</div>
+              <div className="stat-label">פיפי ביום</div>
+            </div>
+            <div className="stat-box">
+              <div className="stat-value">{Math.round(stats.dailyData.reduce((s, d) => s + d.poo, 0) / 7)}</div>
+              <div className="stat-label">קקי ביום</div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </>
   );
 };
@@ -1433,6 +1667,24 @@ const SettingsView = ({
             onClick={() => updateSetting('pumpReminder', !settings.pumpReminder)}
           ></div>
         </div>
+        <div className="setting-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div className="setting-label">💊 תזכורת ויטמין D לתינוקת</div>
+            <div className="setting-desc">תזכורת יומית בשעה קבועה</div>
+            {settings.vitaminDReminder && (
+              <input
+                type="time"
+                value={settings.vitaminDTime || '08:00'}
+                onChange={(e) => updateSetting('vitaminDTime', e.target.value)}
+                style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10, border: '1.5px solid var(--pink-100)', fontFamily: 'inherit', fontSize: 14, display: 'block' }}
+              />
+            )}
+          </div>
+          <div
+            className={`switch ${settings.vitaminDReminder ? 'on' : ''}`}
+            onClick={() => updateSetting('vitaminDReminder', !settings.vitaminDReminder)}
+          ></div>
+        </div>
         <div className="setting-row">
           <div>
             <div className="setting-label">קול בסיום טיימר</div>
@@ -1492,11 +1744,17 @@ const App = () => {
   const [modalType, setModalType] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
   const [toast, setToast] = useState(null);
+  const [historyFilter, setHistoryFilter] = useState(null); // Date object or null
   const [settings, setSettings] = useState({
     feedReminder: false,
     pumpReminder: false,
-    timerSound: true
+    timerSound: true,
+    vitaminDReminder: false,
+    vitaminDTime: '08:00',
+    mamaVitamins: null,
   });
+  const reminderFiredRef = useRef({});
+  const eventsRef = useRef([]);
 
   const isOwner = user && activeOwnerId === user.id;
 
@@ -1610,8 +1868,82 @@ const App = () => {
       .eq('user_id', activeOwnerId)
       .order('started_at', { ascending: false })
       .limit(200);
-    if (!error) setEvents(data || []);
+    if (!error) {
+      setEvents(data || []);
+      eventsRef.current = data || [];
+    }
   };
+
+  // Reminder check: feed, pump, vitamin D, mama vitamins
+  useEffect(() => {
+    const check = () => {
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      const todayKey = now.toDateString();
+      const evts = eventsRef.current;
+
+      if (settings.feedReminder) {
+        const feeds = evts.filter(e => ['nursing', 'bottle'].includes(e.event_type));
+        if (feeds.length > 0) {
+          const last = feeds[0];
+          const hours = (Date.now() - new Date(last.started_at).getTime()) / 3600000;
+          const key = `feed_${last.id}`;
+          if (hours >= 3 && !reminderFiredRef.current[key]) {
+            reminderFiredRef.current[key] = true;
+            playReminderSound();
+            showToast('⏰ זמן להאכלה! 3 שעות עברו');
+          }
+        }
+      }
+
+      if (settings.pumpReminder) {
+        const pumps = evts.filter(e => e.event_type === 'pumping');
+        if (pumps.length > 0) {
+          const last = pumps[0];
+          const hours = (Date.now() - new Date(last.started_at).getTime()) / 3600000;
+          const key = `pump_${last.id}`;
+          if (hours >= 3 && !reminderFiredRef.current[key]) {
+            reminderFiredRef.current[key] = true;
+            playReminderSound();
+            showToast('⏰ זמן לשאיבה! 3 שעות עברו');
+          }
+        }
+      }
+
+      if (settings.vitaminDReminder && settings.vitaminDTime && hhmm === settings.vitaminDTime) {
+        const key = `vitd_${todayKey}`;
+        if (!reminderFiredRef.current[key]) {
+          const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+          const alreadyGiven = evts.some(e => e.event_type === 'vitamin_d' && new Date(e.started_at) >= todayStart);
+          if (!alreadyGiven) {
+            reminderFiredRef.current[key] = true;
+            playReminderSound();
+            showToast('⏰ זמן לתת ויטמין D לתינוקת!');
+          }
+        }
+      }
+
+      const mamaVitamins = settings.mamaVitamins || DEFAULT_MAMA_VITAMINS;
+      mamaVitamins.forEach(v => {
+        if (v.reminderOn && v.time && hhmm === v.time) {
+          const key = `mama_${v.id}_${todayKey}`;
+          if (!reminderFiredRef.current[key]) {
+            const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+            const alreadyTook = evts.some(e => e.event_type === 'mama_vitamin' && e.notes === v.name && new Date(e.started_at) >= todayStart);
+            if (!alreadyTook) {
+              reminderFiredRef.current[key] = true;
+              playReminderSound();
+              showToast(`⏰ זמן לקחת ${v.name}!`);
+            }
+          }
+        }
+      });
+    };
+
+    check();
+    const interval = setInterval(check, 60000);
+    return () => clearInterval(interval);
+  }, [settings]);
 
   const refreshCollaborators = async () => {
     if (!user) return;
@@ -1718,6 +2050,17 @@ const App = () => {
     await supabase.from('events').insert([{ ...event, user_id: activeOwnerId }]);
     setModalType(null);
     showToast('נשמר בהצלחה');
+    loadEvents();
+  };
+
+  const logMamaVitamin = async (vitaminName) => {
+    await supabase.from('events').insert([{
+      user_id: activeOwnerId,
+      event_type: 'mama_vitamin',
+      started_at: new Date().toISOString(),
+      notes: vitaminName
+    }]);
+    showToast(`💜 ${vitaminName} נרשם`);
     loadEvents();
   };
 
@@ -1898,8 +2241,19 @@ const App = () => {
   );
 
   const renderHistory = () => {
+    // Build filter days
+    const filterDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - i); return d;
+    });
+    const dayChipLabel = (d, i) => i === 0 ? 'היום' : i === 1 ? 'אתמול' : `${d.getDate()}/${d.getMonth() + 1}`;
+
+    // Filter events by selected day
+    const filteredEvents = historyFilter
+      ? events.filter(e => { const d = new Date(e.started_at); d.setHours(0,0,0,0); return d.getTime() === historyFilter.getTime(); })
+      : events;
+
     const grouped = {};
-    events.forEach(e => {
+    filteredEvents.forEach(e => {
       const date = new Date(e.started_at);
       date.setHours(0,0,0,0);
       const key = date.toISOString();
@@ -1907,36 +2261,48 @@ const App = () => {
       grouped[key].push(e);
     });
 
-    if (Object.keys(grouped).length === 0) {
-      return (
-        <div className="card">
-          <div className="empty">
-            <div className="empty-emoji">📋</div>
-            <div className="empty-text">אין היסטוריה עדיין</div>
-          </div>
+    return (
+      <>
+        {/* Date filter chips */}
+        <div className="date-filter">
+          <button className={`date-chip ${!historyFilter ? 'active' : ''}`} onClick={() => setHistoryFilter(null)}>הכל</button>
+          {filterDays.map((d, i) => (
+            <button
+              key={d.toISOString()}
+              className={`date-chip ${historyFilter && historyFilter.getTime() === d.getTime() ? 'active' : ''}`}
+              onClick={() => setHistoryFilter(d)}
+            >{dayChipLabel(d, i)}</button>
+          ))}
         </div>
-      );
-    }
 
-    return Object.entries(grouped).map(([dateKey, dayEvents]) => (
-      <div key={dateKey} className="card">
-        <div className="card-title">📅 {formatHebrewDate(new Date(dateKey))}</div>
-        {dayEvents.map(e => {
-          const cfg = EVENT_TYPES[e.event_type];
-          return (
-            <div key={e.id} className="history-item">
-              <div className="history-icon" style={{background: cfg.bg, color: cfg.color}}>{cfg.icon}</div>
-              <div className="history-content" onClick={() => setEditingEvent(e)} style={{cursor: 'pointer'}}>
-                <div className="history-title">{cfg.label}{e.amount_ml ? ` · ${e.amount_ml} מ״ל` : ''}{e.side ? ` · ${e.side === 'right' ? 'ימני' : e.side === 'left' ? 'שמאלי' : 'שניהם'}` : ''}</div>
-                <div className="history-meta">{formatClock(e.started_at)}{e.duration_seconds ? ` · ${Math.floor(e.duration_seconds/60)} ד׳` : ''}{e.notes ? ` · ${e.notes}` : ''}</div>
-              </div>
-              <button className="history-edit" onClick={() => setEditingEvent(e)} aria-label="ערוך">✎</button>
-              <button className="history-delete" onClick={() => deleteEvent(e.id)} aria-label="מחק">×</button>
+        {Object.keys(grouped).length === 0 ? (
+          <div className="card">
+            <div className="empty">
+              <div className="empty-emoji">📋</div>
+              <div className="empty-text">{historyFilter ? 'אין רישומים ביום זה' : 'אין היסטוריה עדיין'}</div>
             </div>
-          );
-        })}
-      </div>
-    ));
+          </div>
+        ) : Object.entries(grouped).map(([dateKey, dayEvents]) => (
+          <div key={dateKey} className="card">
+            <div className="card-title">📅 {formatHebrewDate(new Date(dateKey))}</div>
+            {dayEvents.map(e => {
+              const cfg = EVENT_TYPES[e.event_type] || { label: e.event_type, icon: '•', color: '#888', bg: '#eee' };
+              return (
+                <div key={e.id} className="history-item">
+                  <div className="history-icon" style={{background: cfg.bg, color: cfg.color}}>{cfg.icon}</div>
+                  <div className="history-content" onClick={() => setEditingEvent(e)} style={{cursor: 'pointer'}}>
+                    <div className="history-title">{cfg.label}{e.amount_ml ? ` · ${e.amount_ml} מ״ל` : ''}{e.side ? ` · ${e.side === 'right' ? 'ימני' : e.side === 'left' ? 'שמאלי' : 'שניהם'}` : ''}{e.notes && e.event_type === 'mama_vitamin' ? ` · ${e.notes}` : ''}</div>
+                    <div className="history-meta">{formatClock(e.started_at)}{e.duration_seconds ? ` · ${Math.floor(e.duration_seconds/60)} ד׳` : ''}{e.notes && e.event_type !== 'mama_vitamin' ? ` · ${e.notes}` : ''}</div>
+                  </div>
+                  <button className="history-edit" onClick={() => setEditingEvent(e)} aria-label="ערוך">✎</button>
+                  <button className="history-delete" onClick={() => deleteEvent(e.id)} aria-label="מחק">×</button>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </>
+    );
   };
 
   return (
@@ -1952,6 +2318,14 @@ const App = () => {
       {view === 'home' && renderHome()}
       {view === 'stats' && <StatsView events={events} />}
       {view === 'history' && renderHistory()}
+      {view === 'mama' && (
+        <MamaVitaminsView
+          events={events}
+          onLogVitamin={logMamaVitamin}
+          settings={settings}
+          onUpdateSettings={setSettings}
+        />
+      )}
       {view === 'settings' && (
         <SettingsView
           user={user}
@@ -1984,6 +2358,10 @@ const App = () => {
         <button className={`nav-btn ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>
           <span className="nav-btn-icon">📋</span>
           <span className="nav-btn-label">היסטוריה</span>
+        </button>
+        <button className={`nav-btn ${view === 'mama' ? 'active' : ''}`} onClick={() => setView('mama')}>
+          <span className="nav-btn-icon">💜</span>
+          <span className="nav-btn-label">ויטמינים</span>
         </button>
         <button className={`nav-btn ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}>
           <span className="nav-btn-icon">⚙️</span>
